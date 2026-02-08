@@ -1,5 +1,5 @@
 const { addonBuilder } = require('stremio-addon-sdk')
-const { fetchCatalog, SOURCE_NAME } = require('./porthuAdapter')
+const { fetchCatalog, fetchMeta, SOURCE_NAME } = require('./porthuAdapter')
 const { manifest } = require('./manifest')
 
 function createAddonInterface() {
@@ -31,6 +31,18 @@ function createAddonInterface() {
     }
   })
 
+
+  builder.defineMetaHandler(async ({ type, id }) => {
+    if (!['movie', 'series'].includes(type)) return { meta: null }
+
+    try {
+      const result = await fetchMeta({ type, id })
+      return { meta: result.meta || null }
+    } catch (error) {
+      console.error(`[${SOURCE_NAME}] meta handler failed: ${error.message}`)
+      return { meta: null }
+    }
+  })
   return builder.getInterface()
 }
 

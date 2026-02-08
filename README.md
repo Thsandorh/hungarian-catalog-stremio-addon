@@ -20,6 +20,7 @@ A Stremio catalog addon that pulls movie and series metadata from Port.hu and ex
 - `GET /manifest.json`
 - `GET /catalog/:type/:id.json`
 - `GET /catalog/:type/:id/:extra.json`
+- `GET /meta/:type/:id.json`
 
 Examples:
 

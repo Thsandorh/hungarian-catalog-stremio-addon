@@ -3,7 +3,7 @@ const manifest = {
   version: '1.2.0',
   name: 'Port.hu Catalog',
   description: 'Stremio catalog addon for Port.hu movie and series listings.',
-  resources: ['catalog'],
+  resources: ['catalog', 'meta'],
   types: ['movie', 'series'],
   idPrefixes: ['porthu:'],
   catalogs: [

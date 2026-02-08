@@ -12,6 +12,8 @@ const CATALOG_URLS = {
   series: ['https://port.hu/tv', 'https://port.hu/sorozat', 'https://port.hu']
 }
 
+const META_CACHE = new Map()
+
 const http = axios.create({
   timeout: DEFAULT_TIMEOUT_MS,
   headers: {
@@ -23,22 +25,47 @@ const http = axios.create({
   validateStatus: (s) => s >= 200 && s < 400
 })
 
-function makeMetaId(type, canonicalUrl) {
-  const hash = crypto.createHash('sha1').update(canonicalUrl).digest('hex').slice(0, 24)
-  return `porthu:${type}:${hash}`
+function sanitizeText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function canonicalizeUrl(value) {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    url.hash = ''
+    url.search = ''
+    return url.toString()
+  } catch {
+    return value.split('#')[0].split('?')[0]
+  }
 }
 
 function absolutize(baseUrl, maybeRelative) {
   if (!maybeRelative) return null
   try {
-    return new URL(maybeRelative, baseUrl).toString()
+    return canonicalizeUrl(new URL(maybeRelative, baseUrl).toString())
   } catch {
     return null
   }
 }
 
-function sanitizeText(value) {
-  return String(value || '').replace(/\s+/g, ' ').trim()
+function extractEntityId(url) {
+  const text = String(url || '')
+  const m = text.match(/\/(movie|episode|person|event)-([0-9]+)/i)
+  if (m) return `${m[1].toLowerCase()}-${m[2]}`
+  return null
+}
+
+function makeMetaId(type, canonicalUrl, name) {
+  const entityId = extractEntityId(canonicalUrl)
+  if (entityId) return `porthu:${type}:${entityId}`
+  const hash = crypto
+    .createHash('sha1')
+    .update(`${type}:${canonicalUrl || name || ''}`)
+    .digest('hex')
+    .slice(0, 24)
+  return `porthu:${type}:h-${hash}`
 }
 
 function parseJsonLdBlocks($, pageUrl) {
@@ -71,8 +98,7 @@ function parseJsonLdBlocks($, pageUrl) {
             poster: absolutize(pageUrl, item.image),
             description: sanitizeText(item.description),
             releaseInfo: sanitizeText(item.datePublished || item.releaseDate),
-            genre: sanitizeText(Array.isArray(item.genre) ? item.genre.join(', ') : item.genre),
-            _from: 'jsonld:list'
+            genre: sanitizeText(Array.isArray(item.genre) ? item.genre.join(', ') : item.genre)
           })
         }
       }
@@ -86,8 +112,7 @@ function parseJsonLdBlocks($, pageUrl) {
           poster: absolutize(pageUrl, entry.image),
           description: sanitizeText(entry.description),
           releaseInfo: sanitizeText(entry.datePublished || entry.releaseDate),
-          genre: sanitizeText(Array.isArray(entry.genre) ? entry.genre.join(', ') : entry.genre),
-          _from: 'jsonld:item'
+          genre: sanitizeText(Array.isArray(entry.genre) ? entry.genre.join(', ') : entry.genre)
         })
       }
     }
@@ -99,25 +124,28 @@ function parseJsonLdBlocks($, pageUrl) {
 function parseDomCards($, pageUrl) {
   const items = []
   const cardSelectors = [
-    'article a[href]',
-    '.card a[href]',
-    '.item a[href]',
-    '[data-testid*="card"] a[href]',
     'a[href*="/adatlap/film/"]',
     'a[href*="/adatlap/sorozat/"]',
-    'a[href*="film"]',
-    'a[href*="sorozat"]'
+    'article a[href]',
+    '.card a[href]',
+    '.item a[href]'
   ]
 
   for (const sel of cardSelectors) {
     $(sel).each((_, el) => {
       const href = $(el).attr('href')
-      const name = sanitizeText($(el).attr('title') || $(el).text())
-      if (!href || !name || name.length < 2) return
-
       const canonical = absolutize(pageUrl, href)
+      if (!canonical || !canonical.includes('/adatlap/')) return
+
       const root = $(el).closest('article, .card, .item, li, div')
+      const name = sanitizeText($(el).attr('title') || root.find('h2, h3, h4').first().text() || $(el).text())
+      if (!name || name.length < 2) return
+
       const img = root.find('img').first()
+      const poster = absolutize(
+        pageUrl,
+        img.attr('src') || img.attr('data-src') || img.attr('data-original') || img.attr('data-lazy')
+      )
       const description = sanitizeText(
         root.find('p, .description, .lead, [class*="desc"]').first().text()
       )
@@ -130,15 +158,14 @@ function parseDomCards($, pageUrl) {
       items.push({
         name,
         url: canonical,
-        poster: absolutize(pageUrl, img.attr('src') || img.attr('data-src')),
+        poster,
         description,
         releaseInfo,
-        genre: '',
-        _from: `dom:${sel}`
+        genre: ''
       })
     })
 
-    if (items.length >= 150) break
+    if (items.length >= 250) break
   }
 
   return items
@@ -149,25 +176,27 @@ function normalizeType(targetType, row) {
   if (targetType === 'movie') return 'movie'
 
   const bucket = `${row.url || ''} ${row.name || ''} ${row.genre || ''}`.toLowerCase()
-  if (bucket.includes('sorozat') || bucket.includes('series')) return 'series'
+  if (bucket.includes('/adatlap/sorozat/') || bucket.includes('sorozat') || bucket.includes('series')) {
+    return 'series'
+  }
   return 'movie'
 }
 
 function toMeta(targetType, row) {
-  const canonicalUrl = row.url || `urn:porthu:${row.name}`
+  const canonicalUrl = canonicalizeUrl(row.url) || `urn:porthu:${row.name}`
   const type = normalizeType(targetType, row)
   const name = sanitizeText(row.name)
   if (!name) return null
 
   return {
-    id: makeMetaId(type, canonicalUrl),
+    id: makeMetaId(type, canonicalUrl, name),
     type,
     name,
     poster: row.poster || undefined,
     description: row.description || undefined,
     releaseInfo: row.releaseInfo || undefined,
     genres: row.genre ? row.genre.split(',').map((g) => sanitizeText(g)).filter(Boolean) : undefined,
-    website: row.url || undefined
+    website: canonicalUrl || undefined
   }
 }
 
@@ -211,7 +240,7 @@ async function fetchCatalog({ type, genre, skip = 0, limit = 50 }) {
     try {
       const part = await fetchOneCatalogPage(url)
       rows.push(...part)
-      if (rows.length >= skip + limit + 20) break
+      if (rows.length >= skip + limit + 80) break
     } catch (error) {
       errors.push(`${url}: ${error.message}`)
     }
@@ -223,7 +252,12 @@ async function fetchCatalog({ type, genre, skip = 0, limit = 50 }) {
       const genreNeedle = genre.toLowerCase()
       return (meta.genres || []).some((g) => g.toLowerCase().includes(genreNeedle))
     })
+    .filter((meta) => Boolean(meta.poster))
     .slice(skip, skip + limit)
+
+  for (const meta of metas) {
+    META_CACHE.set(meta.id, meta)
+  }
 
   return {
     source: SOURCE_NAME,
@@ -236,8 +270,23 @@ async function fetchCatalog({ type, genre, skip = 0, limit = 50 }) {
   }
 }
 
+async function fetchMeta({ type, id }) {
+  if (META_CACHE.has(id)) return { meta: META_CACHE.get(id) }
+
+  const movieResult = await fetchCatalog({ type: type || 'movie', limit: 80, skip: 0 })
+  const fromMovie = movieResult.metas.find((m) => m.id === id)
+  if (fromMovie) return { meta: fromMovie }
+
+  const seriesResult = await fetchCatalog({ type: 'series', limit: 80, skip: 0 })
+  const fromSeries = seriesResult.metas.find((m) => m.id === id)
+  if (fromSeries) return { meta: fromSeries }
+
+  return { meta: null }
+}
+
 module.exports = {
   fetchCatalog,
+  fetchMeta,
   fetchOneCatalogPage,
   parseJsonLdBlocks,
   parseDomCards,
