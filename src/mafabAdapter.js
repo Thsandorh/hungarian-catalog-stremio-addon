@@ -132,9 +132,9 @@ function parsePage(html, url) {
       name: title,
       url: detail,
       poster,
-      description: sanitizeText(itemRoot.find('p,.description,.lead').first().text()),
-      releaseInfo: sanitizeText(itemRoot.find('time').attr('datetime') || itemRoot.find('time').text()),
-      imdbId: extractImdbId(itemRoot.text())
+      description: sanitizeText(root.find('p,.description,.lead').first().text()),
+      releaseInfo: sanitizeText(root.find('time').attr('datetime') || root.find('time').text()),
+      imdbId: extractImdbId(root.text())
     })
   })
 
