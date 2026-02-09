@@ -1,6 +1,6 @@
 const manifest = {
   id: 'community.porthu.catalog',
-  version: '1.7.0',
+  version: '1.8.0',
   name: 'Port.hu Catalog',
   description: 'Stremio catalog addon for Port.hu movie and series listings.',
   resources: ['catalog', 'meta', 'stream'],

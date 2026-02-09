@@ -10,10 +10,7 @@ const PAGE_CACHE_TTL_MS = Number(process.env.PORT_HU_PAGE_CACHE_TTL_MS || 10 * 6
 const CATALOG_CACHE_TTL_MS = Number(process.env.PORT_HU_CATALOG_CACHE_TTL_MS || 5 * 60 * 1000)
 const DETAIL_CONCURRENCY = Number(process.env.PORT_HU_DETAIL_CONCURRENCY || 8)
 
-const CATALOG_URLS = {
-  movie: ['https://port.hu/film', 'https://port.hu/mozi', 'https://port.hu'],
-  series: ['https://port.hu/sorozat', 'https://port.hu/tv', 'https://port.hu']
-}
+const SOURCE_URLS = ['https://port.hu/film', 'https://port.hu/tv', 'https://port.hu/mozi', 'https://port.hu']
 
 const META_CACHE = new Map()
 const DETAIL_CACHE = new Map()
@@ -73,15 +70,15 @@ function extractImdbId(value) {
   return m ? m[0].toLowerCase() : null
 }
 
-function makeMetaId(type, canonicalUrl, name) {
+function makeMetaId(canonicalUrl, name) {
   const entityId = extractEntityId(canonicalUrl)
-  if (entityId) return `porthu:${type}:${entityId}`
+  if (entityId) return `porthu:mixed:${entityId}`
   const hash = crypto
     .createHash('sha1')
-    .update(`${type}:${canonicalUrl || name || ''}`)
+    .update(`${canonicalUrl || name || ''}`)
     .digest('hex')
     .slice(0, 24)
-  return `porthu:${type}:h-${hash}`
+  return `porthu:mixed:h-${hash}`
 }
 
 function isPosterUrl(url) {
@@ -196,22 +193,7 @@ function parseDomCards($, pageUrl) {
   return items
 }
 
-function rowMatchesType(targetType, row) {
-  const url = String(row.url || '').toLowerCase()
-  const hasEpisode = url.includes('episode-')
-
-  if (targetType === 'movie') {
-    return url.includes('/adatlap/film/') && !url.includes('/adatlap/sorozat/') && !hasEpisode
-  }
-
-  if (targetType === 'series') {
-    return url.includes('/adatlap/sorozat/') || hasEpisode
-  }
-
-  return true
-}
-
-function toMeta(targetType, row) {
+function toMeta(row) {
   const canonicalUrl = canonicalizeUrl(row.url) || `urn:porthu:${row.name}`
   const name = sanitizeText(row.name)
   if (!name) return null
@@ -219,8 +201,8 @@ function toMeta(targetType, row) {
   const imdbId = extractImdbId(row.imdbId || canonicalUrl)
 
   return {
-    id: imdbId || makeMetaId(targetType, canonicalUrl, name),
-    type: targetType,
+    id: imdbId || makeMetaId(canonicalUrl, name),
+    type: 'movie',
     name,
     poster: row.poster || undefined,
     description: row.description || undefined,
@@ -346,30 +328,29 @@ async function fetchOneCatalogPage(url) {
   return rows
 }
 
-function catalogCacheKey({ type, genre, skip, limit }) {
-  return `${type}|${genre || ''}|${skip}|${limit}`
+function catalogCacheKey({ genre, skip, limit }) {
+  return `${genre || ''}|${skip}|${limit}`
 }
 
-async function fetchCatalog({ type, genre, skip = 0, limit = 50 }) {
-  const key = catalogCacheKey({ type, genre, skip, limit })
+async function fetchCatalog({ genre, skip = 0, limit = 50 }) {
+  const key = catalogCacheKey({ genre, skip, limit })
   const now = Date.now()
   const cached = CATALOG_CACHE.get(key)
   if (cached && cached.expiresAt > now) return cached.payload
 
-  const urls = CATALOG_URLS[type] || CATALOG_URLS.movie
   const errors = []
+  const settled = await Promise.allSettled(SOURCE_URLS.map((url) => fetchOneCatalogPage(url)))
 
-  const settled = await Promise.allSettled(urls.map((url) => fetchOneCatalogPage(url)))
   const rows = []
   settled.forEach((result, idx) => {
     if (result.status === 'fulfilled') rows.push(...result.value)
-    else errors.push(`${urls[idx]}: ${result.reason?.message || 'fetch failed'}`)
+    else errors.push(`${SOURCE_URLS[idx]}: ${result.reason?.message || 'fetch failed'}`)
   })
 
-  const typedRows = uniqueRows(rows).filter((r) => rowMatchesType(type, r))
-  await enrichRows(typedRows)
+  const mixedRows = uniqueRows(rows)
+  await enrichRows(mixedRows)
 
-  const filtered = dedupeMetas(typedRows.map((r) => toMeta(type, r)).filter(Boolean)).filter((meta) => {
+  const filtered = dedupeMetas(mixedRows.map((r) => toMeta(r)).filter(Boolean)).filter((meta) => {
     if (!genre) return true
     const genreNeedle = genre.toLowerCase()
     return (meta.genres || []).some((g) => g.toLowerCase().includes(genreNeedle))
@@ -383,7 +364,7 @@ async function fetchCatalog({ type, genre, skip = 0, limit = 50 }) {
 
   const payload = {
     source: SOURCE_NAME,
-    type,
+    type: 'movie',
     genre,
     skip,
     limit,
@@ -395,23 +376,16 @@ async function fetchCatalog({ type, genre, skip = 0, limit = 50 }) {
   return payload
 }
 
-async function fetchMeta({ type, id }) {
+async function fetchMeta({ id }) {
   if (META_CACHE.has(id)) return { meta: META_CACHE.get(id) }
 
-  const primary = await fetchCatalog({ type: type || 'movie', limit: 120, skip: 0 })
-  const primaryMatch = primary.metas.find((m) => m.id === id)
-  if (primaryMatch) return { meta: primaryMatch }
-
-  const secondaryType = type === 'series' ? 'movie' : 'series'
-  const secondary = await fetchCatalog({ type: secondaryType, limit: 120, skip: 0 })
-  const secondaryMatch = secondary.metas.find((m) => m.id === id)
-  if (secondaryMatch) return { meta: secondaryMatch }
-
-  return { meta: null }
+  const catalog = await fetchCatalog({ limit: 300, skip: 0 })
+  const match = catalog.metas.find((m) => m.id === id)
+  return { meta: match || null }
 }
 
-async function fetchStreams({ type, id }) {
-  const { meta } = await fetchMeta({ type, id })
+async function fetchStreams({ id }) {
+  const { meta } = await fetchMeta({ id })
   if (!meta?.website) return { streams: [] }
 
   return {

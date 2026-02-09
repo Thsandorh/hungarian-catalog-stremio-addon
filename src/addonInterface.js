@@ -13,29 +13,22 @@ function createAddonInterface() {
     const skip = Math.max(Number(extra.skip || 0), 0)
 
     try {
-      const [movieResult, seriesResult] = await Promise.all([
-        fetchCatalog({ type: 'movie', genre: extra.genre, skip: 0, limit: 200 }),
-        fetchCatalog({ type: 'series', genre: extra.genre, skip: 0, limit: 200 })
-      ])
+      const result = await fetchCatalog({ genre: extra.genre, skip, limit })
 
-      const metas = [...movieResult.metas, ...seriesResult.metas].slice(skip, skip + limit)
-      const warnings = [...(movieResult.warnings || []), ...(seriesResult.warnings || [])]
-      if (warnings.length) {
-        console.warn(`[${SOURCE_NAME}] catalog warnings:\n${warnings.join('\n')}`)
+      if (result.warnings?.length) {
+        console.warn(`[${SOURCE_NAME}] catalog warnings:\n${result.warnings.join('\n')}`)
       }
 
-      return { metas }
+      return { metas: result.metas }
     } catch (error) {
       console.error(`[${SOURCE_NAME}] catalog handler failed: ${error.message}`)
       return { metas: [] }
     }
   })
 
-  builder.defineMetaHandler(async ({ type, id }) => {
-    if (!['movie', 'series'].includes(type)) return { meta: null }
-
+  builder.defineMetaHandler(async ({ id }) => {
     try {
-      const result = await fetchMeta({ type, id })
+      const result = await fetchMeta({ id })
       return { meta: result.meta || null }
     } catch (error) {
       console.error(`[${SOURCE_NAME}] meta handler failed: ${error.message}`)
@@ -43,11 +36,9 @@ function createAddonInterface() {
     }
   })
 
-  builder.defineStreamHandler(async ({ type, id }) => {
-    if (!['movie', 'series'].includes(type)) return { streams: [] }
-
+  builder.defineStreamHandler(async ({ id }) => {
     try {
-      return fetchStreams({ type, id })
+      return fetchStreams({ id })
     } catch (error) {
       console.error(`[${SOURCE_NAME}] stream handler failed: ${error.message}`)
       return { streams: [] }

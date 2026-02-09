@@ -35,23 +35,17 @@ async function handleCatalog(type, id, extra, res) {
   const skip = Math.max(Number(extra.skip || 0), 0)
 
   try {
-    const [movieResult, seriesResult] = await Promise.all([
-      fetchCatalog({ type: 'movie', genre: extra.genre, skip: 0, limit: 200 }),
-      fetchCatalog({ type: 'series', genre: extra.genre, skip: 0, limit: 200 })
-    ])
-    const metas = [...movieResult.metas, ...seriesResult.metas].slice(skip, skip + limit)
-    return sendJson(res, 200, { metas }, 'public, s-maxage=300, stale-while-revalidate=600')
+    const result = await fetchCatalog({ genre: extra.genre, skip, limit })
+    return sendJson(res, 200, { metas: result.metas }, 'public, s-maxage=300, stale-while-revalidate=600')
   } catch (error) {
     console.error(`catalog fetch failed: ${error.message}`)
     return sendJson(res, 200, { metas: [] }, 'public, max-age=60')
   }
 }
 
-async function handleMeta(type, id, res) {
-  if (!['movie', 'series'].includes(type)) return sendJson(res, 200, { meta: null })
-
+async function handleMeta(id, res) {
   try {
-    const result = await fetchMeta({ type, id })
+    const result = await fetchMeta({ id })
     return sendJson(res, 200, { meta: result.meta || null }, 'public, max-age=300')
   } catch (error) {
     console.error(`meta fetch failed: ${error.message}`)
@@ -59,12 +53,9 @@ async function handleMeta(type, id, res) {
   }
 }
 
-
-async function handleStream(type, id, res) {
-  if (!['movie', 'series'].includes(type)) return sendJson(res, 200, { streams: [] })
-
+async function handleStream(id, res) {
   try {
-    const result = await fetchStreams({ type, id })
+    const result = await fetchStreams({ id })
     return sendJson(res, 200, { streams: result.streams || [] }, 'public, max-age=300')
   } catch (error) {
     console.error(`stream fetch failed: ${error.message}`)
@@ -96,14 +87,14 @@ module.exports = async (req, res) => {
 
     const metaMatch = path.match(/^\/meta\/([^/]+)\/(.+)\.json$/)
     if (metaMatch) {
-      const [, type, id] = metaMatch
-      return handleMeta(type, decodeURIComponent(id), res)
+      const [, , id] = metaMatch
+      return handleMeta(decodeURIComponent(id), res)
     }
 
     const streamMatch = path.match(/^\/stream\/([^/]+)\/(.+)\.json$/)
     if (streamMatch) {
-      const [, type, id] = streamMatch
-      return handleStream(type, decodeURIComponent(id), res)
+      const [, , id] = streamMatch
+      return handleStream(decodeURIComponent(id), res)
     }
 
     return sendJson(res, 404, { error: 'Not found' })

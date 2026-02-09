@@ -5,6 +5,7 @@ A Stremio catalog addon that pulls movie and series metadata from Port.hu and ex
 ## Features
 
 - Single mixed catalog (`porthu-mixed`) containing both movies and series
+- Port.hu data is treated as a single mixed feed (no strict movie/series separation by source URL).
 - Multiple extraction strategies for source resilience:
   - JSON-LD parsing (`Movie`, `TVSeries`, `ItemList`)
   - DOM card-style parsing fallback
