@@ -182,6 +182,17 @@ function toId(url, imdb) {
 function parsePage(html, url) {
   const $ = cheerio.load(html)
   const rows = []
+  const posterByDetailUrl = new Map()
+
+  $('a[href*="/movies/"]').each((_, el) => {
+    const href = $(el).attr('href')
+    const detail = absolutize(url, href)
+    if (!detail) return
+    const root = $(el).closest('.item, article, .card, .movie-box, li, div')
+    const itemRoot = root.closest('.item').length ? root.closest('.item') : root
+    const poster = extractPosterFromRoot($, itemRoot, url)
+    if (poster) posterByDetailUrl.set(detail, poster)
+  })
 
   $('a[href*="/movies/"]').each((_, el) => {
     const href = $(el).attr('href')
@@ -195,7 +206,7 @@ function parsePage(html, url) {
     )
     if (!title || title.length < 2) return
 
-    const poster = extractPosterFromRoot($, itemRoot, url)
+    const poster = extractPosterFromRoot($, itemRoot, url) || posterByDetailUrl.get(detail) || null
 
     rows.push({
       name: title,
@@ -214,7 +225,20 @@ function dedupe(rows) {
   const map = new Map()
   for (const row of rows) {
     const key = row.url
-    if (!map.has(key)) map.set(key, row)
+    if (!map.has(key)) {
+      map.set(key, row)
+      continue
+    }
+
+    const prev = map.get(key)
+    map.set(key, {
+      ...prev,
+      name: prev.name || row.name,
+      poster: prev.poster || row.poster,
+      description: prev.description || row.description,
+      releaseInfo: prev.releaseInfo || row.releaseInfo,
+      imdbId: prev.imdbId || row.imdbId
+    })
   }
   return [...map.values()]
 }

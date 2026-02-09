@@ -55,3 +55,19 @@ test('parseDetailHints extracts high-quality og:image and imdb id', () => {
   assert.equal(hints.imdbId, 'tt0068646')
   assert.equal(hints.name, 'The Godfather')
 })
+
+test('parsePage reuses poster found on duplicate movie link blocks', () => {
+  const html = `
+    <div class="item">
+      <a href="/movies/chernobyl-323732.html"><div class="image lazyNbg" data-src="https://www.mafab.hu/static/thumb/w1000/2019t/126/01/323732_1557184290.7753.jpg"></div></a>
+    </div>
+    <div class="item">
+      <div class="title"><a href="/movies/chernobyl-323732.html" title="Csernobil (2019)">Csernobil (2019)</a></div>
+    </div>
+  `
+
+  const rows = _internals.parsePage(html, 'https://www.mafab.hu/sorozatok/sorozatok/')
+  const chernobyl = rows.find((r) => /chernobyl-323732/.test(r.url))
+  assert.ok(chernobyl)
+  assert.equal(chernobyl.poster, 'https://www.mafab.hu/static/thumb/w500/2019t/126/01/323732_1557184290.7753.jpg')
+})
