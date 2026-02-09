@@ -18,6 +18,7 @@ const CATALOG_SOURCES = {
 const SOURCE_URLS = CATALOG_SOURCES['hu-mixed']
 
 const META_CACHE = new Map()
+const DETAIL_HINTS_CACHE = new Map()
 
 const http = axios.create({
   timeout: Number(process.env.MAFAB_HTTP_TIMEOUT_MS || 12000),
@@ -32,11 +33,6 @@ const http = axios.create({
 
 function sanitizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
-}
-
-function cleanTitle(title) {
-  // Remove leading rank numbers like "95 Title", "95. Title", "95) Title", etc.
-  return sanitizeText(title).replace(/^\d+[\.\)\s]+\s*/, '')
 }
 
 function absolutize(base, href) {
@@ -76,42 +72,23 @@ function upscalePosterUrl(posterUrl) {
 function extractPosterFromRoot($, root, pageUrl) {
   const candidates = []
 
-  // Check picture elements first (modern lazy loading)
-  root.find('picture source, picture img').each((_, el) => {
-    const elem = $(el)
-    candidates.push(elem.attr('data-srcset'))
-    candidates.push(elem.attr('srcset'))
-    candidates.push(elem.attr('data-src'))
-    candidates.push(elem.attr('src'))
-  })
-
-  // Check all img elements
   root.find('img').each((_, img) => {
     const el = $(img)
     candidates.push(el.attr('data-original'))
     candidates.push(el.attr('data-src'))
-    candidates.push(el.attr('data-lazy'))
-    candidates.push(el.attr('data-lazy-src'))
     candidates.push(pickBestSrcFromSrcset(el.attr('data-srcset')))
     candidates.push(el.attr('src'))
     candidates.push(pickBestSrcFromSrcset(el.attr('srcset')))
   })
 
-  // Check other lazy-loading patterns
-  root.find('[data-src], [data-lazy-src], [data-original]').each((_, el) => {
-    candidates.push($(el).attr('data-src'))
-    candidates.push($(el).attr('data-lazy-src'))
-    candidates.push($(el).attr('data-original'))
-  })
-
-  // Check background images
+  root.find('[data-src]').each((_, el) => candidates.push($(el).attr('data-src')))
   root.find('[style*="background-image"]').each((_, el) => candidates.push(extractUrlFromStyle($(el).attr('style'))))
 
   const resolved = candidates
     .map((v) => absolutize(pageUrl, v))
     .filter(Boolean)
-    .filter((v) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(v))
-    .filter((v) => !/logo|icon|sprite|ajax-loader|placeholder/i.test(v))
+    .filter((v) => /\.(jpe?g|png|webp)(\?|$)/i.test(v))
+    .filter((v) => !/logo|icon|sprite|ajax-loader/i.test(v))
 
   const prioritized = resolved.sort((a, b) => {
     const sa = /\/static\/thumb\/|\/profiles\//i.test(a) ? 1 : 0
@@ -125,6 +102,74 @@ function extractPosterFromRoot($, root, pageUrl) {
 function extractImdbId(value) {
   const m = String(value || '').match(/tt[0-9]{5,10}/i)
   return m ? m[0].toLowerCase() : null
+}
+
+function parseDetailHints(html, pageUrl) {
+  const $ = cheerio.load(html)
+  const ogImage =
+    $('meta[property="og:image"]').attr('content') ||
+    $('meta[name="twitter:image"]').attr('content') ||
+    null
+  const ogDescription =
+    $('meta[property="og:description"]').attr('content') ||
+    $('meta[name="description"]').attr('content') ||
+    null
+  const ogTitle = $('meta[property="og:title"]').attr('content') || $('title').text() || null
+  const imdbLink =
+    $('a[href*="imdb.com/title/"]').first().attr('href') ||
+    String(html || '').match(/imdb\.com\/title\/(tt[0-9]{5,10})/i)?.[0] ||
+    null
+
+  return {
+    poster: upscalePosterUrl(absolutize(pageUrl, ogImage)),
+    description: sanitizeText(ogDescription),
+    name: sanitizeText(ogTitle),
+    imdbId: extractImdbId(imdbLink || html)
+  }
+}
+
+async function fetchDetailHints(detailUrl) {
+  if (!detailUrl) return null
+  if (DETAIL_HINTS_CACHE.has(detailUrl)) return DETAIL_HINTS_CACHE.get(detailUrl)
+
+  try {
+    const res = await http.get(detailUrl)
+    const hints = parseDetailHints(res.data, detailUrl)
+    DETAIL_HINTS_CACHE.set(detailUrl, hints)
+    return hints
+  } catch {
+    DETAIL_HINTS_CACHE.set(detailUrl, null)
+    return null
+  }
+}
+
+async function enrichRows(rows, { maxItems = 30, concurrency = 4 } = {}) {
+  const out = [...rows]
+  let idx = 0
+
+  async function worker() {
+    while (idx < out.length) {
+      const current = idx
+      idx += 1
+      if (current >= maxItems) break
+
+      const row = out[current]
+      const shouldEnrich = !row.poster || !row.imdbId
+      if (!shouldEnrich || !row.url) continue
+
+      const hints = await fetchDetailHints(row.url)
+      if (!hints) continue
+
+      if (!row.poster && hints.poster) row.poster = hints.poster
+      if (!row.imdbId && hints.imdbId) row.imdbId = hints.imdbId
+      if (!row.description && hints.description) row.description = hints.description
+      if (hints.name && (!row.name || row.name.length < 2)) row.name = hints.name
+    }
+  }
+
+  const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker())
+  await Promise.allSettled(workers)
+  return out
 }
 
 function toId(url, imdb) {
@@ -145,10 +190,9 @@ function parsePage(html, url) {
 
     const root = $(el).closest('.item, article, .card, .movie-box, li, div')
     const itemRoot = root.closest('.item').length ? root.closest('.item') : root
-    const rawTitle = sanitizeText(
+    const title = sanitizeText(
       $(el).attr('title') || $(el).attr('aria-label') || itemRoot.find('h1,h2,h3,h4,.title').first().text() || $(el).text()
     )
-    const title = cleanTitle(rawTitle)
     if (!title || title.length < 2) return
 
     const poster = extractPosterFromRoot($, itemRoot, url)
@@ -157,9 +201,9 @@ function parsePage(html, url) {
       name: title,
       url: detail,
       poster,
-      description: sanitizeText(root.find('p,.description,.lead').first().text()),
-      releaseInfo: sanitizeText(root.find('time').attr('datetime') || root.find('time').text()),
-      imdbId: extractImdbId(root.text())
+      description: sanitizeText(itemRoot.find('p,.description,.lead').first().text()),
+      releaseInfo: sanitizeText(itemRoot.find('time').attr('datetime') || itemRoot.find('time').text()),
+      imdbId: extractImdbId(itemRoot.text())
     })
   })
 
@@ -215,7 +259,12 @@ async function fetchCatalog({ catalogId = 'hu-mixed', genre, skip = 0, limit = 5
     }
   }
 
-  let metas = dedupe(rows).map(toMeta)
+  const enrichedRows = await enrichRows(dedupe(rows), {
+    maxItems: Number(process.env.MAFAB_ENRICH_MAX || 30),
+    concurrency: Number(process.env.MAFAB_ENRICH_CONCURRENCY || 4)
+  })
+
+  let metas = enrichedRows.map(toMeta)
   metas = metas.sort((a, b) => {
     const ap = a.poster ? 1 : 0
     const bp = b.poster ? 1 : 0
@@ -265,6 +314,7 @@ module.exports = {
     CATALOG_SOURCES,
     extractPosterFromRoot,
     upscalePosterUrl,
-    parsePage
+    parsePage,
+    parseDetailHints
   }
 }

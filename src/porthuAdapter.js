@@ -32,11 +32,6 @@ function sanitizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
 
-function cleanTitle(title) {
-  // Remove leading rank numbers like "95 Title", "95. Title", "95) Title", etc.
-  return sanitizeText(title).replace(/^\d+[\.\)\s]+\s*/, '')
-}
-
 function canonicalizeUrl(value) {
   if (!value) return null
   try {
@@ -118,7 +113,7 @@ function parseJsonLdBlocks($, pageUrl) {
           const item = listEl.item || listEl
           if (!item || typeof item !== 'object') continue
           items.push({
-            name: cleanTitle(sanitizeText(item.name || listEl.name)),
+            name: sanitizeText(item.name || listEl.name),
             url: absolutize(pageUrl, item.url || listEl.url),
             poster: absolutize(pageUrl, item.image),
             description: sanitizeText(item.description),
@@ -132,7 +127,7 @@ function parseJsonLdBlocks($, pageUrl) {
       const typeArr = Array.isArray(type) ? type : [type]
       if (typeArr.some((t) => ['Movie', 'TVSeries', 'CreativeWork'].includes(t))) {
         items.push({
-          name: cleanTitle(sanitizeText(entry.name)),
+          name: sanitizeText(entry.name),
           url: absolutize(pageUrl, entry.url),
           poster: absolutize(pageUrl, entry.image),
           description: sanitizeText(entry.description),
@@ -157,27 +152,20 @@ function parseDomCards($, pageUrl) {
       if (!canonical || !canonical.includes('/adatlap/')) return
 
       const root = $(el).closest('article, .event-holder, .event-card, .card, .item, li, div')
-      const rawName = sanitizeText(
+      const name = sanitizeText(
         $(el).attr('title') ||
           $(el).attr('aria-label') ||
           root.find('h1, h2, h3, h4, .title').first().text() ||
           $(el).text()
       )
-      const name = cleanTitle(rawName)
       if (!name || name.length < 2) return
 
-      const imgs = root.find('img, picture source, picture img').toArray().map((node) => $(node))
+      const imgs = root.find('img').toArray().map((node) => $(node))
       let poster = null
       for (const img of imgs) {
         const candidate = absolutize(
           pageUrl,
-          img.attr('src') ||
-          img.attr('data-src') ||
-          img.attr('data-original') ||
-          img.attr('data-lazy') ||
-          img.attr('data-lazy-src') ||
-          img.attr('srcset')?.split(',')[0]?.trim()?.split(' ')[0] ||
-          img.attr('data-srcset')?.split(',')[0]?.trim()?.split(' ')[0]
+          img.attr('src') || img.attr('data-src') || img.attr('data-original') || img.attr('data-lazy')
         )
         if (isPosterUrl(candidate)) {
           poster = candidate
@@ -264,7 +252,7 @@ async function fetchDetailHints(detailUrl) {
         $('meta[property="og:description"]').attr('content') ||
           $('meta[name="description"]').attr('content')
       ),
-      name: cleanTitle(sanitizeText($('meta[property="og:title"]').attr('content') || $('h1').first().text())),
+      name: sanitizeText($('meta[property="og:title"]').attr('content') || $('h1').first().text()),
       imdbId: extractImdbId(
         $('a[href*="imdb.com/title/tt"]').attr('href') ||
           $('meta[property="og:see_also"]').attr('content') ||

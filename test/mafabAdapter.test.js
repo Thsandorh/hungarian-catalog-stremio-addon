@@ -38,3 +38,20 @@ test('extractPosterFromRoot prefers larger srcset candidate', () => {
   const poster = _internals.extractPosterFromRoot($, $('.item').first(), 'https://www.mafab.hu/filmek/filmek/')
   assert.equal(poster, 'https://www.mafab.hu/static/thumb/w500/profiles/a.jpg')
 })
+
+test('parseDetailHints extracts high-quality og:image and imdb id', () => {
+  const html = `
+    <html><head>
+      <meta property="og:image" content="https://www.mafab.hu/static/profiles/2016/66/20/2551.jpg" />
+      <meta property="og:description" content="Classic mafia drama." />
+      <meta property="og:title" content="The Godfather" />
+    </head><body>
+      <a href="https://www.imdb.com/title/tt0068646/">IMDb</a>
+    </body></html>
+  `
+
+  const hints = _internals.parseDetailHints(html, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
+  assert.equal(hints.poster, 'https://www.mafab.hu/static/profiles/2016/66/20/2551.jpg')
+  assert.equal(hints.imdbId, 'tt0068646')
+  assert.equal(hints.name, 'The Godfather')
+})
