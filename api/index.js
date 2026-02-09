@@ -181,3 +181,5 @@ module.exports = async (req, res) => {
     })
   }
 }
+
+module.exports._internals = { getRequestOrigin, renderConfigureHtml }

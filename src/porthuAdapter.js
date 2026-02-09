@@ -332,7 +332,8 @@ function catalogCacheKey({ genre, skip, limit }) {
   return `${genre || ''}|${skip}|${limit}`
 }
 
-async function fetchCatalog({ genre, skip = 0, limit = 50 }) {
+async function fetchCatalog({ catalogId = 'hu-mixed', genre, skip = 0, limit = 50 }) {
+  if (catalogId.startsWith('mafab-')) return { source: SOURCE_NAME, metas: [] }
   const key = catalogCacheKey({ genre, skip, limit })
   const now = Date.now()
   const cached = CATALOG_CACHE.get(key)
