@@ -2,20 +2,12 @@ const axios = require('axios')
 const cheerio = require('cheerio')
 
 const SOURCE_NAME = 'mafab.hu'
-const CATALOG_SOURCES = {
-  'mafab-movies': ['https://mafab.hu/filmek/filmek/'],
-  'mafab-series': ['https://mafab.hu/sorozatok/sorozatok/'],
-  'mafab-streaming': ['https://mafab.hu/vod/top-streaming'],
-  'mafab-cinema': ['https://mafab.hu/cinema/premier/jelenleg-a-mozikban'],
-  'hu-mixed': [
-    'https://mafab.hu/filmek/filmek/',
-    'https://mafab.hu/sorozatok/sorozatok/',
-    'https://mafab.hu/vod/top-streaming',
-    'https://mafab.hu/cinema/premier/jelenleg-a-mozikban'
-  ]
-}
-
-const SOURCE_URLS = CATALOG_SOURCES['hu-mixed']
+const SOURCE_URLS = [
+  'https://mafab.hu/filmek/filmek/',
+  'https://mafab.hu/sorozatok/sorozatok/',
+  'https://mafab.hu/vod/top-streaming',
+  'https://mafab.hu/cinema/premier/jelenleg-a-mozikban'
+]
 
 const META_CACHE = new Map()
 
@@ -110,19 +102,17 @@ function toMeta(row) {
   }
 }
 
-async function fetchCatalog({ catalogId = 'hu-mixed', genre, skip = 0, limit = 50 }) {
-  if (catalogId.startsWith('porthu-')) return { source: SOURCE_NAME, metas: [] }
-  const urls = CATALOG_SOURCES[catalogId] || SOURCE_URLS
-  const settled = await Promise.allSettled(urls.map((u) => http.get(u)))
+async function fetchCatalog({ genre, skip = 0, limit = 50 }) {
+  const settled = await Promise.allSettled(SOURCE_URLS.map((u) => http.get(u)))
   const rows = []
   const warnings = []
 
   for (let i = 0; i < settled.length; i += 1) {
     const item = settled[i]
     if (item.status === 'fulfilled') {
-      rows.push(...parsePage(item.value.data, urls[i]))
+      rows.push(...parsePage(item.value.data, SOURCE_URLS[i]))
     } else {
-      warnings.push(`${urls[i]}: ${item.reason?.message || 'failed'}`)
+      warnings.push(`${SOURCE_URLS[i]}: ${item.reason?.message || 'failed'}`)
     }
   }
 

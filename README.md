@@ -8,10 +8,8 @@ Configurable Stremio addon with a professional configure page and source selecti
 - Configure UI with source checkboxes:
   - ✅ Mafab.hu (default enabled)
   - ⬜ Port.hu (default disabled)
-- "Install in Stremio" button generating config-specific manifest URL and valid `stremio://` deep link.
-- On Vercel deployment, configure page links are generated from forwarded host/proto headers (no localhost URLs).
-- Source-aware catalogs (Mafab categories + optional Port.hu mixed catalog).
-- Mafab and Port.hu catalogs are always kept separate (no cross-source aggregated catalog).
+- "Install in Stremio" button generating config-specific manifest URL
+- One mixed catalog: `Film és sorozat` (`hu-mixed`)
 - `catalog`, `meta`, and `stream` resources
 - Source adapters:
   - `src/mafabAdapter.js`
@@ -45,23 +43,6 @@ Open:
 
 - Configure page: `http://127.0.0.1:7000/configure`
 - Manifest (default config): `http://127.0.0.1:7000/manifest.json`
-
-## Development checks
-
-Before running tests, install dependencies:
-
-```bash
-npm ci
-```
-
-Run static syntax checks and test suite:
-
-```bash
-npm run check
-npm test
-```
-
-If your GitHub PR page shows a prolonged "Checking for the ability to merge automatically…" state, refresh the page after the checks complete and verify there are no required status checks configured for your branch protection rules.
 
 ## Configured manifest URL format
 

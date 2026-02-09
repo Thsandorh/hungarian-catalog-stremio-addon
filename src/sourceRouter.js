@@ -8,12 +8,6 @@ function selectedAdapters(config) {
   return adapters
 }
 
-function adaptersForCatalog(config, catalogId) {
-  if (String(catalogId || '').startsWith('mafab-')) return config?.sources?.mafab ? [mafab] : []
-  if (String(catalogId || '').startsWith('porthu-')) return config?.sources?.porthu ? [porthu] : []
-  return []
-}
-
 function dedupeMetas(metas) {
   const map = new Map()
   for (const m of metas) {
@@ -23,11 +17,11 @@ function dedupeMetas(metas) {
   return [...map.values()]
 }
 
-async function fetchCatalogFromSources(config, { catalogId, genre, skip, limit }) {
-  const adapters = adaptersForCatalog(config, catalogId)
+async function fetchCatalogFromSources(config, { genre, skip, limit }) {
+  const adapters = selectedAdapters(config)
   if (!adapters.length) return { metas: [] }
 
-  const settled = await Promise.allSettled(adapters.map((a) => a.fetchCatalog({ catalogId, genre, skip: 0, limit: 250 })))
+  const settled = await Promise.allSettled(adapters.map((a) => a.fetchCatalog({ genre, skip: 0, limit: 250 })))
   const metas = []
   const warnings = []
 
