@@ -305,6 +305,29 @@ function toMeta(row, { type = 'movie' } = {}) {
   }
 }
 
+function dedupeMetasByName(metas) {
+  const map = new Map()
+  for (const m of metas) {
+    const norm = (m.name || '').toLowerCase().replace(/\s*\(\d{4}\)\s*$/, '').trim()
+    if (!norm) continue
+    if (!map.has(norm)) {
+      map.set(norm, m)
+      continue
+    }
+    const prev = map.get(norm)
+    const prevScore = (prev.poster ? 1 : 0) + (prev.description ? 1 : 0) + (prev.imdb_id ? 1 : 0)
+    const currScore = (m.poster ? 1 : 0) + (m.description ? 1 : 0) + (m.imdb_id ? 1 : 0)
+    map.set(norm, {
+      ...(currScore > prevScore ? m : prev),
+      poster: prev.poster || m.poster,
+      description: prev.description || m.description,
+      imdb_id: prev.imdb_id || m.imdb_id,
+      website: prev.website || m.website
+    })
+  }
+  return [...map.values()]
+}
+
 async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, skip = 0, limit = 50 }) {
   if (catalogId.startsWith('porthu-')) return { source: SOURCE_NAME, metas: [] }
   const urls = CATALOG_SOURCES[catalogId] || SOURCE_URLS
@@ -341,6 +364,9 @@ async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, ski
   // Only filter out items without a name (truly invalid data)
   metas = metas.filter((m) => Boolean(m.name))
 
+  // Deduplicate by normalized name to catch items with different URLs but same content
+  metas = dedupeMetasByName(metas)
+
   // Sort by poster availability - items with posters first
   const withPoster = metas.filter((m) => Boolean(m.poster))
   const withoutPoster = metas.filter((m) => !m.poster)
@@ -361,16 +387,31 @@ async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, ski
   }
 }
 
-async function fetchMeta({ id }) {
-  if (META_CACHE.has(id)) return { meta: META_CACHE.get(id) }
-  const c = await fetchCatalog({ limit: 200, skip: 0 })
-  return { meta: c.metas.find((m) => m.id === id) || null }
+async function enrichMetaPoster(meta) {
+  if (!meta || meta.poster || !meta.website) return meta
+  const hints = await fetchDetailHints(meta.website)
+  if (hints?.poster) {
+    meta.poster = hints.poster
+    META_CACHE.set(meta.id, meta)
+  }
+  return meta
 }
 
-async function fetchStreams({ id, config }) {
+async function fetchMeta({ id }) {
+  if (META_CACHE.has(id)) {
+    return { meta: await enrichMetaPoster(META_CACHE.get(id)) }
+  }
+  const c = await fetchCatalog({ limit: 200, skip: 0 })
+  const meta = c.metas.find((m) => m.id === id) || null
+  return { meta: await enrichMetaPoster(meta) }
+}
+
+async function fetchStreams({ type, id, config }) {
   if (config?.features?.externalLinks === false) return { streams: [] }
   const { meta } = await fetchMeta({ id })
   if (!meta?.website) return { streams: [] }
+  // Avoid duplicate streams when the same ID appears in both movie and series catalogs
+  if (type && meta.type && type !== meta.type) return { streams: [] }
   return {
     streams: [
       {

@@ -385,10 +385,12 @@ async function fetchMeta({ id }) {
   return { meta: match || null }
 }
 
-async function fetchStreams({ id, config }) {
+async function fetchStreams({ type, id, config }) {
   if (config?.features?.externalLinks === false) return { streams: [] }
   const { meta } = await fetchMeta({ id })
   if (!meta?.website) return { streams: [] }
+  // Avoid duplicate streams when the same ID appears in both movie and series catalogs
+  if (type && meta.type && type !== meta.type) return { streams: [] }
 
   return {
     streams: [

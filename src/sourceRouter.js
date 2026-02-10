@@ -18,7 +18,19 @@ function dedupeMetas(metas) {
   const map = new Map()
   for (const m of metas) {
     if (!m || !m.id) continue
-    if (!map.has(m.id)) map.set(m.id, m)
+    if (!map.has(m.id)) {
+      map.set(m.id, m)
+      continue
+    }
+    const prev = map.get(m.id)
+    map.set(m.id, {
+      ...prev,
+      poster: prev.poster || m.poster,
+      description: prev.description || m.description,
+      imdb_id: prev.imdb_id || m.imdb_id,
+      website: prev.website || m.website,
+      releaseInfo: prev.releaseInfo || m.releaseInfo
+    })
   }
   return [...map.values()]
 }
@@ -58,12 +70,12 @@ async function fetchMetaFromSources(config, { id }) {
   return { meta: null }
 }
 
-async function fetchStreamsFromSources(config, { id }) {
+async function fetchStreamsFromSources(config, { type, id }) {
   if (config?.features?.externalLinks === false) return { streams: [] }
   const adapters = selectedAdapters(config)
   for (const a of adapters) {
     try {
-      const out = await a.fetchStreams({ id, config })
+      const out = await a.fetchStreams({ type, id, config })
       if (out?.streams?.length) return out
     } catch {
       // no-op

@@ -22,7 +22,7 @@ function createAddonInterface(config = defaultConfig()) {
   })
 
   builder.defineMetaHandler(async ({ id }) => fetchMetaFromSources(config, { id }))
-  builder.defineStreamHandler(async ({ id }) => fetchStreamsFromSources(config, { id }))
+  builder.defineStreamHandler(async ({ type, id }) => fetchStreamsFromSources(config, { type, id }))
 
   return builder.getInterface()
 }

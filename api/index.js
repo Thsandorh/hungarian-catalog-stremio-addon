@@ -225,8 +225,9 @@ module.exports = async (req, res) => {
     }
 
     if (rest[0] === 'stream' && rest.length >= 3) {
+      const type = rest[1]
       const id = decodeURIComponent((rest[2] || '').replace(/\.json$/, ''))
-      const out = await fetchStreamsFromSources(config, { id })
+      const out = await fetchStreamsFromSources(config, { type, id })
       return sendJson(res, 200, { streams: out.streams || [] }, 'public, max-age=300')
     }
 
