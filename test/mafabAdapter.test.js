@@ -102,3 +102,16 @@ test('toMeta prefers Cinemeta poster when imdb id exists', () => {
 
   assert.equal(meta.poster, 'https://images.metahub.space/poster/medium/tt0068646/img')
 })
+
+test('toMeta supports series type for Mafab series catalog', () => {
+  const meta = _internals.toMeta(
+    {
+      name: 'Sorsügynökség',
+      imdbId: 'tt1234567',
+      url: 'https://www.mafab.hu/movies/sorsugynokseg-1.html'
+    },
+    { type: 'series' }
+  )
+
+  assert.equal(meta.type, 'series')
+})

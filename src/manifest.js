@@ -11,7 +11,7 @@ function createManifest(config) {
   if (sourcesConfig.mafab) {
     manifestCatalogs.push(
       { type: 'movie', id: 'mafab-movies', name: 'Mafab: Filmek', extra: [{ name: 'genre' }, { name: 'skip' }] },
-      { type: 'movie', id: 'mafab-series', name: 'Mafab: Sorozatok', extra: [{ name: 'genre' }, { name: 'skip' }] },
+      { type: 'series', id: 'mafab-series', name: 'Mafab: Sorozatok', extra: [{ name: 'genre' }, { name: 'skip' }] },
       { type: 'movie', id: 'mafab-streaming', name: 'Mafab: Top streaming', extra: [{ name: 'genre' }, { name: 'skip' }] },
       { type: 'movie', id: 'mafab-cinema', name: 'Mafab: Moziban most', extra: [{ name: 'genre' }, { name: 'skip' }] }
     )

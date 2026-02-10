@@ -161,7 +161,7 @@ module.exports = async (req, res) => {
       const noExtra = id && id.endsWith('.json')
       const catalogId = noExtra ? id.slice(0, -5) : id
 
-      if (type !== 'movie') return sendJson(res, 200, { metas: [] })
+      if (!['movie', 'series'].includes(type)) return sendJson(res, 200, { metas: [] })
 
       const extra = {
         ...(extraPath ? parseExtraString(extraPath) : {}),
@@ -170,7 +170,7 @@ module.exports = async (req, res) => {
 
       const limit = Math.min(Number(process.env.CATALOG_LIMIT || 50), 100)
       const skip = Math.max(Number(extra.skip || 0), 0)
-      const { metas } = await fetchCatalogFromSources(config, { catalogId, genre: extra.genre, skip, limit })
+      const { metas } = await fetchCatalogFromSources(config, { type, catalogId, genre: extra.genre, skip, limit })
       return sendJson(res, 200, { metas }, 'public, s-maxage=300, stale-while-revalidate=600')
     }
 

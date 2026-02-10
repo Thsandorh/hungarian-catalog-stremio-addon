@@ -279,13 +279,13 @@ function dedupe(rows) {
   return [...map.values()]
 }
 
-function toMeta(row) {
+function toMeta(row, { type = 'movie' } = {}) {
   const imdbId = row.imdbId || extractImdbId(row.url)
   const id = toId(row.url, imdbId)
   const cinemetaPoster = imdbId ? `https://images.metahub.space/poster/medium/${imdbId}/img` : null
   return {
     id,
-    type: 'movie',
+    type,
     name: normalizeTitle(row.name),
     poster: cinemetaPoster || row.poster || undefined,
     description: row.description || undefined,
@@ -295,7 +295,7 @@ function toMeta(row) {
   }
 }
 
-async function fetchCatalog({ catalogId = 'hu-mixed', genre, skip = 0, limit = 50 }) {
+async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, skip = 0, limit = 50 }) {
   if (catalogId.startsWith('porthu-')) return { source: SOURCE_NAME, metas: [] }
   const urls = CATALOG_SOURCES[catalogId] || SOURCE_URLS
   const settled = await Promise.allSettled(urls.map(async (u) => {
@@ -325,7 +325,9 @@ async function fetchCatalog({ catalogId = 'hu-mixed', genre, skip = 0, limit = 5
     concurrency: Number(process.env.MAFAB_ENRICH_CONCURRENCY || 4)
   })
 
-  let metas = enrichedRows.map(toMeta)
+  const metaType = catalogId === 'mafab-series' || type === 'series' ? 'series' : 'movie'
+  let metas = enrichedRows.map((row) => toMeta(row, { type: metaType }))
+  metas = metas.filter((m) => Boolean(m.poster) && Boolean(m.website))
   metas = metas.sort((a, b) => {
     const ap = a.poster ? 1 : 0
     const bp = b.poster ? 1 : 0

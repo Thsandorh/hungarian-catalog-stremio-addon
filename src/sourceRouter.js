@@ -23,11 +23,11 @@ function dedupeMetas(metas) {
   return [...map.values()]
 }
 
-async function fetchCatalogFromSources(config, { catalogId, genre, skip, limit }) {
+async function fetchCatalogFromSources(config, { type, catalogId, genre, skip, limit }) {
   const adapters = adaptersForCatalog(config, catalogId)
   if (!adapters.length) return { metas: [] }
 
-  const settled = await Promise.allSettled(adapters.map((a) => a.fetchCatalog({ catalogId, genre, skip: 0, limit: 250 })))
+  const settled = await Promise.allSettled(adapters.map((a) => a.fetchCatalog({ type, catalogId, genre, skip: 0, limit: 250 })))
   const metas = []
   const warnings = []
 
