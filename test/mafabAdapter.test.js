@@ -44,6 +44,12 @@ test('upscalePosterUrl does not downgrade already-large thumbnails', () => {
   assert.equal(_internals.upscalePosterUrl(url), url)
 })
 
+test('posterQualityScore prefers real poster/profile image over scene thumb', () => {
+  const scene = 'https://www.mafab.hu/static/thumb/w1000/2019t/126/01/323732_1557184290.7753.jpg'
+  const poster = 'https://www.mafab.hu/static/profiles/2014/317/10/237638.jpg'
+  assert.ok(_internals.posterQualityScore(poster) > _internals.posterQualityScore(scene))
+})
+
 test('parseDetailHints extracts high-quality og:image and imdb id', () => {
   const html = `
     <html><head>

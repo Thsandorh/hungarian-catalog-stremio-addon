@@ -135,6 +135,17 @@ function parseDetailHints(html, pageUrl) {
   }
 }
 
+function posterQualityScore(url) {
+  const value = String(url || '')
+  if (!value) return 0
+  let score = 1
+  if (/\/static\/[^?]*\.(jpe?g|png|webp)(\?|$)/i.test(value)) score += 1
+  if (/\/static\/thumb\//i.test(value)) score -= 1
+  if (/\/static\/profiles\//i.test(value)) score += 3
+  if (/\/static\/thumb\/w\d+\/[0-9]{4}t\//i.test(value)) score -= 2
+  return score
+}
+
 async function fetchDetailHints(detailUrl) {
   if (!detailUrl) return null
   if (DETAIL_HINTS_CACHE.has(detailUrl)) return DETAIL_HINTS_CACHE.get(detailUrl)
@@ -167,7 +178,9 @@ async function enrichRows(rows, { maxItems = 30, concurrency = 4 } = {}) {
       const hints = await fetchDetailHints(row.url)
       if (!hints) continue
 
-      if (!row.poster && hints.poster) row.poster = hints.poster
+      if (hints.poster && posterQualityScore(hints.poster) > posterQualityScore(row.poster)) {
+        row.poster = hints.poster
+      }
       if (!row.imdbId && hints.imdbId) row.imdbId = hints.imdbId
       if (!row.description && hints.description) row.description = hints.description
       if (hints.name && (!row.name || row.name.length < 2)) row.name = hints.name
@@ -346,6 +359,7 @@ module.exports = {
     extractPosterFromRoot,
     upscalePosterUrl,
     parsePage,
-    parseDetailHints
+    parseDetailHints,
+    posterQualityScore
   }
 }
