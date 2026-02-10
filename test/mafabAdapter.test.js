@@ -65,21 +65,26 @@ test('parsePage extracts description from paragraph', () => {
   assert.equal(rows[0].description, 'Classic mafia drama about the Corleone family.')
 })
 
-test('parseDetailHints extracts imdb id and description', () => {
-  const html = `
-    <html><head>
-      <meta property="og:description" content="Classic mafia drama." />
-      <meta property="og:title" content="The Godfather" />
-    </head><body>
-      <a href="https://www.imdb.com/title/tt0068646/">IMDb</a>
-    </body></html>
-  `
+test('parseAutocompleteLabel extracts clean label text and year', () => {
+  const parsed = _internals.parseAutocompleteLabel('<strong>A keresztapa</strong> (1972) - film')
 
-  const hints = _internals.parseDetailHints(html, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
-  assert.equal(hints.imdbId, 'tt0068646')
-  assert.equal(hints.name, 'The Godfather')
-  assert.equal(hints.description, 'Classic mafia drama.')
-  assert.equal(hints.poster, undefined)
+  assert.equal(parsed.title, 'A keresztapa')
+  assert.equal(parsed.year, 1972)
+})
+
+test('findBestAutocompleteMatch prefers exact Mafab detail URL match', () => {
+  const row = {
+    name: 'A keresztapa',
+    url: 'https://www.mafab.hu/movies/a-keresztapa-2551.html'
+  }
+
+  const best = _internals.findBestAutocompleteMatch([
+    { label: 'A keresztapa 2 (1974)', url: '/movies/a-keresztapa-2-2597.html' },
+    { label: 'A keresztapa (1972)', url: '/movies/a-keresztapa-2551.html' }
+  ], row)
+
+  assert.equal(best.url, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
+  assert.equal(best.year, 1972)
 })
 
 test('toMeta strips numeric prefix from bad streaming title names', () => {
@@ -140,4 +145,8 @@ test('toMeta uses imdb id as the meta id when available', () => {
   })
 
   assert.equal(meta.id, 'tt0068646')
+})
+
+test('getTmdbApiKey returns configured key fallback', () => {
+  assert.equal(_internals.getTmdbApiKey(), process.env.TMDB_API_KEY || process.env.MAFAB_TMDB_API_KEY || 'ffe7ef8916c61835264d2df68276ddc2')
 })
