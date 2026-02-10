@@ -55,6 +55,13 @@ function normalizeTitle(value) {
   return text
     .replace(/^\d{1,3}\s+(?=\p{L}|\d)/u, '')
     .replace(/^\d{1,3}%\s+(?=\p{L}|\d)/u, '')
+    .replace(/^(?:n\/?a|na)\s+(?=\p{L}|\d)/iu, '')
+    .trim()
+}
+
+function normalizeLookupTitle(value) {
+  return normalizeTitle(value)
+    .replace(/\s*\((19\d{2}|20\d{2})\)\s*$/u, '')
     .trim()
 }
 
@@ -154,7 +161,7 @@ async function searchAutocomplete(rowName) {
 
 async function searchTmdbImdbId({ title, year, type }) {
   const apiKey = getTmdbApiKey()
-  const cleanTitle = sanitizeText(title)
+  const cleanTitle = normalizeLookupTitle(title)
   if (!apiKey || !cleanTitle) return null
 
   const mediaType = type === 'series' ? 'tv' : 'movie'
@@ -170,17 +177,24 @@ async function searchTmdbImdbId({ title, year, type }) {
     }
 
     const searchRes = await http.get(`${TMDB_BASE_URL}${searchPath}`, { params: searchParams })
-    const candidate = Array.isArray(searchRes.data?.results) ? searchRes.data.results[0] : null
-    if (!candidate?.id) {
+    const candidates = Array.isArray(searchRes.data?.results) ? searchRes.data.results.slice(0, 5) : []
+    if (!candidates.length) {
       TMDB_CACHE.set(cacheKey, null)
       return null
     }
 
-    const externalIdsPath = mediaType === 'tv' ? `/tv/${candidate.id}/external_ids` : `/movie/${candidate.id}/external_ids`
-    const externalRes = await http.get(`${TMDB_BASE_URL}${externalIdsPath}`, { params: { api_key: apiKey } })
-    const imdbId = extractImdbId(externalRes.data?.imdb_id)
-    TMDB_CACHE.set(cacheKey, imdbId || null)
-    return imdbId || null
+    for (const candidate of candidates) {
+      const externalIdsPath = mediaType === 'tv' ? `/tv/${candidate.id}/external_ids` : `/movie/${candidate.id}/external_ids`
+      const externalRes = await http.get(`${TMDB_BASE_URL}${externalIdsPath}`, { params: { api_key: apiKey } })
+      const imdbId = extractImdbId(externalRes.data?.imdb_id)
+      if (imdbId) {
+        TMDB_CACHE.set(cacheKey, imdbId)
+        return imdbId
+      }
+    }
+
+    TMDB_CACHE.set(cacheKey, null)
+    return null
   } catch {
     TMDB_CACHE.set(cacheKey, null)
     return null

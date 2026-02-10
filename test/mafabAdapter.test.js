@@ -96,6 +96,15 @@ test('toMeta strips numeric prefix from bad streaming title names', () => {
   assert.equal(meta.name, 'Marty Supreme')
 })
 
+test('toMeta strips NA prefix from scraped title noise', () => {
+  const meta = _internals.toMeta({
+    name: 'NA Beléd estem',
+    url: 'https://www.mafab.hu/movies/beled-estem-1.html'
+  })
+
+  assert.equal(meta.name, 'Beléd estem')
+})
+
 test('toMeta uses Cinemeta poster when imdb id exists', () => {
   const meta = _internals.toMeta({
     name: 'The Godfather',
