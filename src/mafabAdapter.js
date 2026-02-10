@@ -258,8 +258,8 @@ async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, ski
   }
 
   const enrichedRows = await enrichRows(dedupe(rows), {
-    maxItems: Number(process.env.MAFAB_ENRICH_MAX || 30),
-    concurrency: Number(process.env.MAFAB_ENRICH_CONCURRENCY || 4)
+    maxItems: Number(process.env.MAFAB_ENRICH_MAX || 200),
+    concurrency: Number(process.env.MAFAB_ENRICH_CONCURRENCY || 8)
   })
 
   const metaType = catalogId === 'mafab-series' || catalogId === 'mafab-series-lists' || catalogId === 'mafab-tv' || type === 'series' ? 'series' : 'movie'
@@ -267,6 +267,11 @@ async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, ski
 
   metas = metas.filter((m) => Boolean(m.name))
   metas = dedupeMetasByName(metas)
+
+  // Items with IMDb ID (and thus Cinemeta poster) first
+  const withPoster = metas.filter((m) => Boolean(m.poster))
+  const withoutPoster = metas.filter((m) => !m.poster)
+  metas = [...withPoster, ...withoutPoster]
 
   if (genre) {
     const g = genre.toLowerCase()
