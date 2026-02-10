@@ -1,18 +1,51 @@
+const MAFAB_CATALOG_IDS = [
+  'mafab-movies',
+  'mafab-series',
+  'mafab-streaming',
+  'mafab-cinema',
+  'mafab-cinema-soon',
+  'mafab-tv',
+  'mafab-movies-lists',
+  'mafab-series-lists',
+  'mafab-streaming-premieres'
+]
+
 function defaultConfig() {
+  const mafabCatalogs = Object.fromEntries(MAFAB_CATALOG_IDS.map((id) => [id, true]))
+
   return {
     sources: {
       mafab: true,
       porthu: false
+    },
+    mafabCatalogs,
+    features: {
+      externalLinks: true
     }
   }
 }
 
 function normalizeConfig(input = {}) {
   const d = defaultConfig()
+
+  const normalizedMafabCatalogs = Object.fromEntries(
+    MAFAB_CATALOG_IDS.map((id) => {
+      const value = input?.mafabCatalogs?.[id]
+      return [id, value !== undefined ? Boolean(value) : d.mafabCatalogs[id]]
+    })
+  )
+
   return {
     sources: {
       mafab: input?.sources?.mafab !== undefined ? Boolean(input.sources.mafab) : d.sources.mafab,
       porthu: input?.sources?.porthu !== undefined ? Boolean(input.sources.porthu) : d.sources.porthu
+    },
+    mafabCatalogs: normalizedMafabCatalogs,
+    features: {
+      externalLinks:
+        input?.features?.externalLinks !== undefined
+          ? Boolean(input.features.externalLinks)
+          : d.features.externalLinks
     }
   }
 }

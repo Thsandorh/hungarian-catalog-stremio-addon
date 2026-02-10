@@ -7,11 +7,21 @@ const CATALOG_SOURCES = {
   'mafab-series': ['https://www.mafab.hu/sorozatok/sorozatok/'],
   'mafab-streaming': ['https://www.mafab.hu/vod/top-streaming'],
   'mafab-cinema': ['https://www.mafab.hu/cinema/premier/jelenleg-a-mozikban'],
+  'mafab-cinema-soon': ['https://www.mafab.hu/cinema/premier/hamarosan-a-mozikban'],
+  'mafab-tv': ['https://www.mafab.hu/tv/tv_kinalat'],
+  'mafab-movies-lists': ['https://www.mafab.hu/filmek/listak/'],
+  'mafab-series-lists': ['https://www.mafab.hu/sorozatok/listak/'],
+  'mafab-streaming-premieres': ['https://www.mafab.hu/vod/streaming-premierek'],
   'hu-mixed': [
     'https://www.mafab.hu/filmek/filmek/',
     'https://www.mafab.hu/sorozatok/sorozatok/',
     'https://www.mafab.hu/vod/top-streaming',
-    'https://www.mafab.hu/cinema/premier/jelenleg-a-mozikban'
+    'https://www.mafab.hu/cinema/premier/jelenleg-a-mozikban',
+    'https://www.mafab.hu/cinema/premier/hamarosan-a-mozikban',
+    'https://www.mafab.hu/tv/tv_kinalat',
+    'https://www.mafab.hu/filmek/listak/',
+    'https://www.mafab.hu/sorozatok/listak/',
+    'https://www.mafab.hu/vod/streaming-premierek'
   ]
 }
 
@@ -354,7 +364,8 @@ async function fetchMeta({ id }) {
   return { meta: c.metas.find((m) => m.id === id) || null }
 }
 
-async function fetchStreams({ id }) {
+async function fetchStreams({ id, config }) {
+  if (config?.features?.externalLinks === false) return { streams: [] }
   const { meta } = await fetchMeta({ id })
   if (!meta?.website) return { streams: [] }
   return {
@@ -363,6 +374,11 @@ async function fetchStreams({ id }) {
         name: 'Mafab',
         title: 'Open on Mafab',
         externalUrl: meta.website
+      },
+      {
+        name: 'Support',
+        title: 'Buy me a coffee on Ko-fi',
+        externalUrl: 'https://ko-fi.com/sandortoth'
       }
     ]
   }

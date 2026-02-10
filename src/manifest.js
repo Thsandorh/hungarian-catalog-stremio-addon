@@ -1,3 +1,17 @@
+const { MAFAB_CATALOG_IDS } = require('./config')
+
+const MAFAB_CATALOGS = {
+  'mafab-movies': { type: 'movie', name: 'Mafab: Filmek' },
+  'mafab-series': { type: 'series', name: 'Mafab: Sorozatok' },
+  'mafab-streaming': { type: 'movie', name: 'Mafab: Top streaming' },
+  'mafab-cinema': { type: 'movie', name: 'Mafab: Moziban most' },
+  'mafab-cinema-soon': { type: 'movie', name: 'Mafab: Hamarosan a moziban' },
+  'mafab-tv': { type: 'series', name: 'Mafab: TV kínálat' },
+  'mafab-movies-lists': { type: 'movie', name: 'Mafab: Filmes listák' },
+  'mafab-series-lists': { type: 'series', name: 'Mafab: Sorozat listák' },
+  'mafab-streaming-premieres': { type: 'movie', name: 'Mafab: Streaming premierek' }
+}
+
 function createManifest(config) {
   const safeConfig = config && typeof config === 'object' ? config : {}
   const sourcesConfig = safeConfig.sources && typeof safeConfig.sources === 'object' ? safeConfig.sources : {}
@@ -9,12 +23,12 @@ function createManifest(config) {
   const manifestCatalogs = []
 
   if (sourcesConfig.mafab) {
-    manifestCatalogs.push(
-      { type: 'movie', id: 'mafab-movies', name: 'Mafab: Filmek', extra: [{ name: 'genre' }, { name: 'skip' }] },
-      { type: 'series', id: 'mafab-series', name: 'Mafab: Sorozatok', extra: [{ name: 'genre' }, { name: 'skip' }] },
-      { type: 'movie', id: 'mafab-streaming', name: 'Mafab: Top streaming', extra: [{ name: 'genre' }, { name: 'skip' }] },
-      { type: 'movie', id: 'mafab-cinema', name: 'Mafab: Moziban most', extra: [{ name: 'genre' }, { name: 'skip' }] }
-    )
+    const enabledCatalogIds = MAFAB_CATALOG_IDS.filter((id) => safeConfig?.mafabCatalogs?.[id] !== false)
+    for (const id of enabledCatalogIds) {
+      const def = MAFAB_CATALOGS[id]
+      if (!def) continue
+      manifestCatalogs.push({ type: def.type, id, name: def.name, extra: [{ name: 'genre' }, { name: 'skip' }] })
+    }
   }
 
   if (sourcesConfig.porthu) {

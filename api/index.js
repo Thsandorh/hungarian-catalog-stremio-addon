@@ -1,5 +1,12 @@
 const { createManifest } = require('../src/manifest')
-const { defaultConfig, normalizeConfig, encodeConfig, decodeConfig, tryDecodeConfig } = require('../src/config')
+const {
+  MAFAB_CATALOG_IDS,
+  defaultConfig,
+  normalizeConfig,
+  encodeConfig,
+  decodeConfig,
+  tryDecodeConfig
+} = require('../src/config')
 const {
   fetchCatalogFromSources,
   fetchMetaFromSources,
@@ -94,11 +101,15 @@ function renderConfigureHtml(origin, config) {
 <body>
   <div class="wrap">
     <h1>Configure HU Movies & Series Addon</h1>
-    <p>Select sources. By default only <b>Mafab.hu</b> is enabled.</p>
+    <p>Select sources and enabled Mafab catalogs. Defaults: all Mafab categories active and external links active.</p>
 
     <form id="cfgForm">
       <div class="card"><label><input type="checkbox" id="src_mafab" ${config.sources.mafab ? 'checked' : ''}> Mafab.hu</label></div>
       <div class="card"><label><input type="checkbox" id="src_porthu" ${config.sources.porthu ? 'checked' : ''}> Port.hu</label></div>
+      <h3>Mafab categories</h3>
+      ${mafabCatalogCheckboxes}
+      <h3>Stream links</h3>
+      <div class="card"><label><input type="checkbox" id="feature_externalLinks" ${config.features?.externalLinks !== false ? 'checked' : ''}> Enable external links (Mafab + Ko-fi)</label></div>
 
       <div class="actions">
         <button type="submit">Generate links</button>
@@ -121,8 +132,16 @@ function renderConfigureHtml(origin, config) {
       sources: {
         mafab: document.getElementById('src_mafab').checked,
         porthu: document.getElementById('src_porthu').checked
+      },
+      mafabCatalogs: {},
+      features: {
+        externalLinks: document.getElementById('feature_externalLinks').checked
       }
     }
+
+    document.querySelectorAll('.mafab-cat').forEach((el) => {
+      cfg.mafabCatalogs[el.dataset.id] = el.checked
+    })
 
     const token = btoa(JSON.stringify(cfg)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
     const manifest = location.origin + '/' + token + '/manifest.json'

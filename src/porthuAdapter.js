@@ -385,7 +385,8 @@ async function fetchMeta({ id }) {
   return { meta: match || null }
 }
 
-async function fetchStreams({ id }) {
+async function fetchStreams({ id, config }) {
+  if (config?.features?.externalLinks === false) return { streams: [] }
   const { meta } = await fetchMeta({ id })
   if (!meta?.website) return { streams: [] }
 

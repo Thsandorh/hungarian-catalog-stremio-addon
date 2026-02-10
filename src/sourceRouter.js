@@ -59,10 +59,11 @@ async function fetchMetaFromSources(config, { id }) {
 }
 
 async function fetchStreamsFromSources(config, { id }) {
+  if (config?.features?.externalLinks === false) return { streams: [] }
   const adapters = selectedAdapters(config)
   for (const a of adapters) {
     try {
-      const out = await a.fetchStreams({ id })
+      const out = await a.fetchStreams({ id, config })
       if (out?.streams?.length) return out
     } catch {
       // no-op
