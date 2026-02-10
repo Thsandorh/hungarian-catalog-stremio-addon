@@ -82,3 +82,23 @@ test('parsePage reuses poster found on duplicate movie link blocks', () => {
   assert.ok(chernobyl)
   assert.equal(chernobyl.poster, 'https://www.mafab.hu/static/thumb/w1000/2019t/126/01/323732_1557184290.7753.jpg')
 })
+
+test('toMeta strips numeric prefix from bad streaming title names', () => {
+  const meta = _internals.toMeta({
+    name: '88 Marty Supreme',
+    url: 'https://www.mafab.hu/movies/marty-supreme-1.html'
+  })
+
+  assert.equal(meta.name, 'Marty Supreme')
+})
+
+test('toMeta prefers Cinemeta poster when imdb id exists', () => {
+  const meta = _internals.toMeta({
+    name: 'The Godfather',
+    imdbId: 'tt0068646',
+    url: 'https://www.mafab.hu/movies/a-keresztapa-2551.html',
+    poster: 'https://www.mafab.hu/static/profiles/2016/66/20/2551.jpg'
+  })
+
+  assert.equal(meta.poster, 'https://images.metahub.space/poster/medium/tt0068646/img')
+})

@@ -35,6 +35,22 @@ function sanitizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
 
+function normalizeTitle(value) {
+  const text = sanitizeText(value)
+  if (!text) return text
+  return text
+    .replace(/^\d{1,3}\s+(?=\p{L}|\d)/u, '')
+    .replace(/^\d{1,3}%\s+(?=\p{L}|\d)/u, '')
+    .trim()
+}
+
+function hasUsefulDescription(value) {
+  const text = sanitizeText(value)
+  if (!text) return false
+  if (text.length < 40) return false
+  return /\p{L}{3,}/u.test(text)
+}
+
 function absolutize(base, href) {
   if (!href) return null
   try {
@@ -172,7 +188,7 @@ async function enrichRows(rows, { maxItems = 30, concurrency = 4 } = {}) {
       if (current >= maxItems) break
 
       const row = out[current]
-      const shouldEnrich = !row.poster || !row.imdbId
+      const shouldEnrich = !row.imdbId || !hasUsefulDescription(row.description)
       if (!shouldEnrich || !row.url) continue
 
       const hints = await fetchDetailHints(row.url)
@@ -182,7 +198,7 @@ async function enrichRows(rows, { maxItems = 30, concurrency = 4 } = {}) {
         row.poster = hints.poster
       }
       if (!row.imdbId && hints.imdbId) row.imdbId = hints.imdbId
-      if (!row.description && hints.description) row.description = hints.description
+      if (!hasUsefulDescription(row.description) && hints.description) row.description = hints.description
       if (hints.name && (!row.name || row.name.length < 2)) row.name = hints.name
     }
   }
@@ -221,7 +237,7 @@ function parsePage(html, url) {
 
     const root = $(el).closest('.item, article, .card, .movie-box, li, div')
     const itemRoot = root.closest('.item').length ? root.closest('.item') : root
-    const title = sanitizeText(
+    const title = normalizeTitle(
       $(el).attr('title') || $(el).attr('aria-label') || itemRoot.find('h1,h2,h3,h4,.title').first().text() || $(el).text()
     )
     if (!title || title.length < 2) return
@@ -266,11 +282,12 @@ function dedupe(rows) {
 function toMeta(row) {
   const imdbId = row.imdbId || extractImdbId(row.url)
   const id = toId(row.url, imdbId)
+  const cinemetaPoster = imdbId ? `https://images.metahub.space/poster/medium/${imdbId}/img` : null
   return {
     id,
     type: 'movie',
-    name: row.name,
-    poster: row.poster || undefined,
+    name: normalizeTitle(row.name),
+    poster: cinemetaPoster || row.poster || undefined,
     description: row.description || undefined,
     releaseInfo: row.releaseInfo || undefined,
     imdb_id: imdbId || undefined,
@@ -360,6 +377,7 @@ module.exports = {
     upscalePosterUrl,
     parsePage,
     parseDetailHints,
-    posterQualityScore
+    posterQualityScore,
+    toMeta
   }
 }
