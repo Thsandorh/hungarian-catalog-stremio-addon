@@ -13,56 +13,28 @@ test('mafab catalog source URLs always use www host to avoid redirect loops', ()
   }
 })
 
-test('parsePage extracts title and url from movie link', () => {
-  const html = `
-    <div class="item">
-      <div class="title"><a href="/movies/a-keresztapa-2551.html" title="A keresztapa">A keresztapa</a></div>
-    </div>
-  `
-
-  const rows = _internals.parsePage(html, 'https://www.mafab.hu/filmek/filmek/')
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].name, 'A keresztapa')
-  assert.equal(rows[0].url, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
-})
-
-test('parsePage does not extract poster fields', () => {
-  const html = `
-    <div class="item">
-      <div class="image lazyNbg" data-src="/static/thumb/w150/profiles/2016/66/20/2551.jpg"></div>
-      <div class="title"><a href="/movies/a-keresztapa-2551.html" title="A keresztapa">A keresztapa</a></div>
-    </div>
-  `
-
-  const rows = _internals.parsePage(html, 'https://www.mafab.hu/filmek/filmek/')
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].poster, undefined)
-})
-
-test('parsePage extracts imdb id from item text', () => {
+test('parsePage extracts only catalog presence (url + lookup title)', () => {
   const html = `
     <div class="item">
       <a href="/movies/a-keresztapa-2551.html" title="A keresztapa">A keresztapa</a>
+      <p>Should not be scraped as metadata.</p>
       <span>tt0068646</span>
     </div>
   `
 
   const rows = _internals.parsePage(html, 'https://www.mafab.hu/filmek/filmek/')
   assert.equal(rows.length, 1)
-  assert.equal(rows[0].imdbId, 'tt0068646')
+  assert.equal(rows[0].url, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
+  assert.equal(rows[0].lookupTitle, 'A Keresztapa')
+  assert.equal(rows[0].name, 'A Keresztapa')
+  assert.equal(rows[0].year, null)
+  assert.equal(rows[0].imdbId, null)
+  assert.equal(rows[0].description, undefined)
+  assert.equal(rows[0].releaseInfo, undefined)
 })
 
-test('parsePage extracts description from paragraph', () => {
-  const html = `
-    <div class="item">
-      <a href="/movies/a-keresztapa-2551.html" title="A keresztapa">A keresztapa</a>
-      <p>Classic mafia drama about the Corleone family.</p>
-    </div>
-  `
-
-  const rows = _internals.parsePage(html, 'https://www.mafab.hu/filmek/filmek/')
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].description, 'Classic mafia drama about the Corleone family.')
+test('titleFromDetailUrl builds readable title from slug', () => {
+  assert.equal(_internals.titleFromDetailUrl('https://www.mafab.hu/movies/the-roses-81432.html'), 'The Roses')
 })
 
 test('parseAutocompleteLabel extracts clean label text and year', () => {
@@ -74,43 +46,21 @@ test('parseAutocompleteLabel extracts clean label text and year', () => {
 
 test('findBestAutocompleteMatch prefers exact Mafab detail URL match', () => {
   const row = {
-    name: 'A keresztapa',
+    lookupTitle: 'A Keresztapa',
     url: 'https://www.mafab.hu/movies/a-keresztapa-2551.html'
   }
 
   const best = _internals.findBestAutocompleteMatch([
-    { label: 'A keresztapa 2 (1974)', url: '/movies/a-keresztapa-2-2597.html' },
-    { label: 'A keresztapa (1972)', url: '/movies/a-keresztapa-2551.html' }
+    { cat: 'movie', label: 'A keresztapa 2 (1974)', id: '/movies/a-keresztapa-2-2597.html' },
+    { cat: 'movie', label: 'A keresztapa (1972)', id: '/movies/a-keresztapa-2551.html' }
   ], row)
 
   assert.equal(best.url, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
   assert.equal(best.year, 1972)
 })
 
-
-test('normalizeTitle strips trailing year from display title', () => {
-  assert.equal(_internals.normalizeTitle('Egyél müzlit! (2021)'), 'Egyél müzlit!')
-})
-
-test('parsePage falls back to URL slug when scraped title is placeholder', () => {
-  const html = `
-    <div class="item">
-      <a href="/movies/the-roses-81432.html" title="Ismeretlen (2025)">Ismeretlen (2025)</a>
-    </div>
-  `
-
-  const rows = _internals.parsePage(html, 'https://www.mafab.hu/filmek/listak/')
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].name, 'The Roses')
-})
-
-test('toMeta strips numeric prefix from bad streaming title names', () => {
-  const meta = _internals.toMeta({
-    name: '88 Marty Supreme',
-    url: 'https://www.mafab.hu/movies/marty-supreme-1.html'
-  })
-
-  assert.equal(meta.name, 'Marty Supreme')
+test('normalizeTitle strips noise tokens and trailing year', () => {
+  assert.equal(_internals.normalizeTitle('NA Egyél müzlit! (2021)'), 'Egyél müzlit!')
 })
 
 test('toMeta strips NA prefix from scraped title noise', () => {
@@ -134,6 +84,7 @@ test('toMeta strips trailing year from title in final output', () => {
 test('toMeta uses Cinemeta poster when imdb id exists', () => {
   const meta = _internals.toMeta({
     name: 'The Godfather',
+    lookupTitle: 'The Godfather',
     imdbId: 'tt0068646',
     url: 'https://www.mafab.hu/movies/a-keresztapa-2551.html'
   })
@@ -141,13 +92,14 @@ test('toMeta uses Cinemeta poster when imdb id exists', () => {
   assert.equal(meta.poster, 'https://images.metahub.space/poster/medium/tt0068646/img')
 })
 
-test('toMeta has no poster when imdb id is missing', () => {
+test('toMeta falls back to lookupTitle when name is empty', () => {
   const meta = _internals.toMeta({
-    name: 'Ismeretlen film',
-    url: 'https://www.mafab.hu/movies/ismeretlen-film-1.html'
+    name: '',
+    lookupTitle: 'The Roses',
+    url: 'https://www.mafab.hu/movies/the-roses-81432.html'
   })
 
-  assert.equal(meta.poster, undefined)
+  assert.equal(meta.name, 'The Roses')
 })
 
 test('toMeta supports series type for Mafab series catalog', () => {
@@ -161,15 +113,6 @@ test('toMeta supports series type for Mafab series catalog', () => {
   )
 
   assert.equal(meta.type, 'series')
-})
-
-test('toMeta generates mafab: prefixed id when no imdb id', () => {
-  const meta = _internals.toMeta({
-    name: 'Ismeretlen film',
-    url: 'https://www.mafab.hu/movies/ismeretlen-film-1.html'
-  })
-
-  assert.equal(meta.id, 'mafab:ismeretlen-film-1')
 })
 
 test('toMeta uses imdb id as the meta id when available', () => {
