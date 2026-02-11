@@ -42,9 +42,9 @@ test('manifest has no Port.hu catalog ids and prefixes', () => {
   assert.ok(!manifest.idPrefixes.includes('porthu:'))
 })
 
-test('manifest branding is Flix-Catalogs with icon', () => {
+test('manifest branding is Flix-Catalogs without invalid logo url', () => {
   const manifest = createManifest({ sources: { mafab: true } })
   assert.equal(manifest.name, 'Flix-Catalogs')
   assert.equal(manifest.id, 'community.flix.catalogs')
-  assert.match(manifest.logo, /^data:image\/svg\+xml;base64,/)
+  assert.equal(manifest.logo, undefined)
 })

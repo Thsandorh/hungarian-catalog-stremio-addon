@@ -1,8 +1,5 @@
 const { MAFAB_CATALOG_IDS } = require('./config')
 
-const ICON_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#5b7cff'/><stop offset='100%' stop-color='#00c2ff'/></linearGradient></defs><rect width='256' height='256' rx='56' fill='#0f1530'/><path d='M58 62h140v36H98v28h84v34H98v36h100v36H58V62z' fill='url(#g)'/><rect x='170' y='62' width='28' height='170' fill='#ffffff' opacity='0.9'/></svg>`
-const ICON_DATA_URI = `data:image/svg+xml;base64,${Buffer.from(ICON_SVG).toString('base64')}`
-
 const MAFAB_CATALOGS = {
   'mafab-movies': { type: 'movie', name: 'Mafab: Movies' },
   'mafab-series': { type: 'series', name: 'Mafab: Series' },
@@ -54,7 +51,6 @@ function createManifest(config) {
     resources: ['catalog', 'meta', 'stream'],
     types: ['movie', 'series'],
     idPrefixes: ['tt', 'mafab:'],
-    logo: ICON_DATA_URI,
     catalogs: manifestCatalogs,
     behaviorHints: {
       configurable: true,

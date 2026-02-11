@@ -13,6 +13,9 @@ const {
   fetchStreamsFromSources
 } = require('../src/sourceRouter')
 
+
+const LOGO_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#5b7cff'/><stop offset='100%' stop-color='#00c2ff'/></linearGradient></defs><rect width='256' height='256' rx='56' fill='#0f1530'/><path d='M58 62h140v36H98v28h84v34H98v36h100v36H58V62z' fill='url(#g)'/><rect x='170' y='62' width='28' height='170' fill='#ffffff' opacity='0.9'/></svg>`
+
 function sendJson(res, statusCode, payload, cacheControl) {
   res.statusCode = statusCode
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -74,9 +77,13 @@ function getRequestOrigin(req) {
   return `${protocol}://${host}`
 }
 
-function renderConfigureHtml(origin, config, currentToken = null) {
+function renderConfigureHtml(origin, config) {
   const token = encodeConfig(config)
-  const manifestUrl = `${origin}/${token}/manifest.json`
+  const defaultToken = encodeConfig(defaultConfig())
+  const useTokenizedPath = token !== defaultToken
+  const manifestPath = useTokenizedPath ? `/${token}/manifest.json` : '/manifest.json'
+  const configurePath = useTokenizedPath ? `/${token}/configure` : '/configure'
+  const manifestUrl = `${origin}${manifestPath}`
   const stremioManifest = manifestUrl.replace(/^https?:\/\//, '')
   const stremioUrl = `stremio://${stremioManifest}`
 
@@ -161,7 +168,7 @@ function renderConfigureHtml(origin, config, currentToken = null) {
   const form = document.getElementById('cfgForm')
   const installBtn = document.getElementById('installBtn')
   const manifestEl = document.getElementById('manifestUrl')
-  const initialToken = ${JSON.stringify(currentToken || token)}
+  const defaultToken = ${JSON.stringify(encodeConfig(defaultConfig()))}
 
   function encodeConfigToken(cfg) {
     const json = JSON.stringify(cfg)
@@ -194,11 +201,13 @@ function renderConfigureHtml(origin, config, currentToken = null) {
   function updateLinks() {
     const cfg = buildConfig()
     const token = encodeConfigToken(cfg)
-    const manifest = location.origin + '/' + token + '/manifest.json'
-    const configure = location.origin + '/' + token + '/configure'
+    const useTokenizedPath = token !== defaultToken
+    const manifestPath = useTokenizedPath ? '/' + token + '/manifest.json' : '/manifest.json'
+    const configurePath = useTokenizedPath ? '/' + token + '/configure' : '/configure'
+    const manifest = location.origin + manifestPath
     manifestEl.textContent = manifest
     installBtn.href = 'stremio://' + manifest.replace(/^https?:\/\//, '')
-    history.replaceState(null, '', configure)
+    history.replaceState(null, '', configurePath)
   }
 
   form.addEventListener('change', updateLinks)
@@ -223,11 +232,27 @@ module.exports = async (req, res) => {
     }
 
     if (rest.length === 1 && rest[0] === 'configure') {
-      return sendHtml(res, 200, renderConfigureHtml(getRequestOrigin(req), config, token))
+      return sendHtml(res, 200, renderConfigureHtml(getRequestOrigin(req), config))
     }
 
     if (rest.length === 1 && rest[0] === 'manifest.json') {
-      return sendJson(res, 200, manifest, 'public, max-age=300')
+      const requestOrigin = getRequestOrigin(req)
+      return sendJson(
+        res,
+        200,
+        {
+          ...manifest,
+          logo: `${requestOrigin}/logo.svg`
+        },
+        'public, max-age=300'
+      )
+    }
+
+    if (rest.length === 1 && rest[0] === 'logo.svg') {
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+      return res.end(LOGO_SVG)
     }
 
     if (rest[0] === 'catalog') {
