@@ -16,7 +16,16 @@ const {
 
 const LOGO_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#5b7cff'/><stop offset='100%' stop-color='#00c2ff'/></linearGradient></defs><rect width='256' height='256' rx='56' fill='#0f1530'/><path d='M58 62h140v36H98v28h84v34H98v36h100v36H58V62z' fill='url(#g)'/><rect x='170' y='62' width='28' height='170' fill='#ffffff' opacity='0.9'/></svg>`
 
+
+function setCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+  res.setHeader('Access-Control-Max-Age', '86400')
+}
+
 function sendJson(res, statusCode, payload, cacheControl) {
+  setCorsHeaders(res)
   res.statusCode = statusCode
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   if (cacheControl) res.setHeader('Cache-Control', cacheControl)
@@ -24,6 +33,7 @@ function sendJson(res, statusCode, payload, cacheControl) {
 }
 
 function sendHtml(res, statusCode, html) {
+  setCorsHeaders(res)
   res.statusCode = statusCode
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.end(html)
@@ -220,12 +230,19 @@ function renderConfigureHtml(origin, config) {
 
 module.exports = async (req, res) => {
   try {
+    if ((req.method || 'GET').toUpperCase() === 'OPTIONS') {
+      setCorsHeaders(res)
+      res.statusCode = 204
+      return res.end('')
+    }
+
     const url = new URL(req.url, 'http://localhost')
     const { token, rest } = parseRequestContext(url.pathname)
     const config = normalizeConfig(decodeConfig(token) || defaultConfig())
     const manifest = createManifest(config)
 
     if (url.pathname === '/') {
+      setCorsHeaders(res)
       res.statusCode = 302
       res.setHeader('Location', '/configure')
       return res.end('Redirecting to /configure')
@@ -248,6 +265,7 @@ module.exports = async (req, res) => {
     }
 
     if (rest.length === 1 && rest[0] === 'logo.svg') {
+      setCorsHeaders(res)
       res.statusCode = 200
       res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
       res.setHeader('Cache-Control', 'public, max-age=86400')

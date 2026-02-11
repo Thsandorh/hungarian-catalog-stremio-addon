@@ -133,3 +133,53 @@ test('logo svg endpoint returns image content type', async () => {
   assert.match(headers['content-type'], /image\/svg\+xml/)
   assert.match(body, /<svg/)
 })
+
+
+test('manifest endpoint returns CORS headers for web fetch', async () => {
+  const req = {
+    url: '/manifest.json',
+    headers: { host: 'localhost:7000' }
+  }
+
+  let body = ''
+  const headers = {}
+  const res = {
+    statusCode: 0,
+    setHeader(name, value) {
+      headers[name.toLowerCase()] = value
+    },
+    end(chunk = '') {
+      body += chunk
+    }
+  }
+
+  await apiHandler(req, res)
+
+  assert.equal(res.statusCode, 200)
+  assert.equal(headers['access-control-allow-origin'], '*')
+  assert.match(headers['access-control-allow-methods'], /OPTIONS/)
+  assert.ok(body.includes('"catalogs"'))
+})
+
+test('options preflight returns 204 with CORS headers', async () => {
+  const req = {
+    method: 'OPTIONS',
+    url: '/manifest.json',
+    headers: { host: 'localhost:7000' }
+  }
+
+  const headers = {}
+  const res = {
+    statusCode: 0,
+    setHeader(name, value) {
+      headers[name.toLowerCase()] = value
+    },
+    end() {}
+  }
+
+  await apiHandler(req, res)
+
+  assert.equal(res.statusCode, 204)
+  assert.equal(headers['access-control-allow-origin'], '*')
+  assert.match(headers['access-control-allow-methods'], /OPTIONS/)
+})
