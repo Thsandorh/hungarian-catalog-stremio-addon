@@ -9,7 +9,19 @@ const MAFAB_CATALOGS = {
   'mafab-tv': { type: 'series', name: 'Mafab: TV kínálat' },
   'mafab-movies-lists': { type: 'movie', name: 'Mafab: Filmes listák' },
   'mafab-series-lists': { type: 'series', name: 'Mafab: Sorozat listák' },
-  'mafab-streaming-premieres': { type: 'movie', name: 'Mafab: Streaming premierek' }
+  'mafab-streaming-premieres': { type: 'movie', name: 'Mafab: Streaming premierek' },
+  'mafab-streaming-netflix': { type: 'movie', name: 'Mafab: Top streaming / Netflix' },
+  'mafab-streaming-hbo': { type: 'movie', name: 'Mafab: Top streaming / HBO Max' },
+  'mafab-streaming-telekom-tvgo': { type: 'movie', name: 'Mafab: Top streaming / Telekom TVGO' },
+  'mafab-streaming-cinego': { type: 'movie', name: 'Mafab: Top streaming / Cinego' },
+  'mafab-streaming-filmio': { type: 'movie', name: 'Mafab: Top streaming / Filmio' },
+  'mafab-streaming-amazon': { type: 'movie', name: 'Mafab: Top streaming / Amazon Prime Video' },
+  'mafab-streaming-apple-tv': { type: 'movie', name: 'Mafab: Top streaming / Apple TV+' },
+  'mafab-streaming-disney': { type: 'movie', name: 'Mafab: Top streaming / Disney+' },
+  'mafab-streaming-skyshowtime': { type: 'movie', name: 'Mafab: Top streaming / SkyShowtime' },
+  'mafab-year-window': { type: 'movie', name: 'Mafab: Filmek (aktuális + következő év)' },
+  'mafab-best-current-year': { type: 'movie', name: 'Mafab: Legjobb filmek (aktuális év)' },
+  'mafab-total-gross': { type: 'movie', name: 'Mafab: Bevételi toplista (aktuális + következő év)' }
 }
 
 function createManifest(config) {

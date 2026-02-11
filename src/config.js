@@ -7,7 +7,19 @@ const MAFAB_CATALOG_IDS = [
   'mafab-tv',
   'mafab-movies-lists',
   'mafab-series-lists',
-  'mafab-streaming-premieres'
+  'mafab-streaming-premieres',
+  'mafab-streaming-netflix',
+  'mafab-streaming-hbo',
+  'mafab-streaming-telekom-tvgo',
+  'mafab-streaming-cinego',
+  'mafab-streaming-filmio',
+  'mafab-streaming-amazon',
+  'mafab-streaming-apple-tv',
+  'mafab-streaming-disney',
+  'mafab-streaming-skyshowtime',
+  'mafab-year-window',
+  'mafab-best-current-year',
+  'mafab-total-gross'
 ]
 
 function defaultConfig() {

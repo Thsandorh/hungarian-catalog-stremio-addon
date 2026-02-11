@@ -4,6 +4,11 @@ const { execFile } = require('node:child_process')
 const { promisify } = require('node:util')
 
 const SOURCE_NAME = 'mafab.hu'
+const CURRENT_YEAR = Number(process.env.MAFAB_YEAR_FROM || new Date().getFullYear())
+const NEXT_YEAR = Number(process.env.MAFAB_YEAR_TO || CURRENT_YEAR + 1)
+const YEAR_FILTER_URL = `https://www.mafab.hu/filmek/filmek/1/?yrf=${CURRENT_YEAR}&yrt=${NEXT_YEAR}`
+const BEST_CURRENT_YEAR_URL = `https://www.mafab.hu/filmek/filmek/1/?yrf=${CURRENT_YEAR}&yrt=${CURRENT_YEAR}`
+const TOTAL_GROSS_URL = `https://www.mafab.hu/beveteli-listak/total_gross/normalview/?year_from=${CURRENT_YEAR}&year_to=${NEXT_YEAR}`
 const CATALOG_SOURCES = {
   'mafab-movies': ['https://www.mafab.hu/filmek/filmek/'],
   'mafab-series': ['https://www.mafab.hu/sorozatok/sorozatok/'],
@@ -14,6 +19,18 @@ const CATALOG_SOURCES = {
   'mafab-movies-lists': ['https://www.mafab.hu/filmek/listak/'],
   'mafab-series-lists': ['https://www.mafab.hu/sorozatok/listak/'],
   'mafab-streaming-premieres': ['https://www.mafab.hu/vod/streaming-premierek'],
+  'mafab-streaming-netflix': ['https://www.mafab.hu/vod/top-streaming/netflix'],
+  'mafab-streaming-hbo': ['https://www.mafab.hu/vod/top-streaming/hbo'],
+  'mafab-streaming-telekom-tvgo': ['https://www.mafab.hu/vod/top-streaming/tvgo'],
+  'mafab-streaming-cinego': ['https://www.mafab.hu/vod/top-streaming/cinego'],
+  'mafab-streaming-filmio': ['https://www.mafab.hu/vod/top-streaming/filmio'],
+  'mafab-streaming-amazon': ['https://www.mafab.hu/vod/top-streaming/amazon'],
+  'mafab-streaming-apple-tv': ['https://www.mafab.hu/vod/top-streaming/appletv'],
+  'mafab-streaming-disney': ['https://www.mafab.hu/vod/top-streaming/disney'],
+  'mafab-streaming-skyshowtime': ['https://www.mafab.hu/vod/top-streaming/skyshowtime'],
+  'mafab-year-window': [YEAR_FILTER_URL],
+  'mafab-best-current-year': [BEST_CURRENT_YEAR_URL],
+  'mafab-total-gross': [TOTAL_GROSS_URL],
   'hu-mixed': [
     'https://www.mafab.hu/filmek/filmek/',
     'https://www.mafab.hu/sorozatok/sorozatok/',
@@ -23,7 +40,19 @@ const CATALOG_SOURCES = {
     'https://www.mafab.hu/tv/tv_kinalat',
     'https://www.mafab.hu/filmek/listak/',
     'https://www.mafab.hu/sorozatok/listak/',
-    'https://www.mafab.hu/vod/streaming-premierek'
+    'https://www.mafab.hu/vod/streaming-premierek',
+    'https://www.mafab.hu/vod/top-streaming/netflix',
+    'https://www.mafab.hu/vod/top-streaming/hbo',
+    'https://www.mafab.hu/vod/top-streaming/tvgo',
+    'https://www.mafab.hu/vod/top-streaming/cinego',
+    'https://www.mafab.hu/vod/top-streaming/filmio',
+    'https://www.mafab.hu/vod/top-streaming/amazon',
+    'https://www.mafab.hu/vod/top-streaming/appletv',
+    'https://www.mafab.hu/vod/top-streaming/disney',
+    'https://www.mafab.hu/vod/top-streaming/skyshowtime',
+    YEAR_FILTER_URL,
+    BEST_CURRENT_YEAR_URL,
+    TOTAL_GROSS_URL
   ]
 }
 

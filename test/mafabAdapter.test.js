@@ -13,6 +13,32 @@ test('mafab catalog source URLs always use www host to avoid redirect loops', ()
   }
 })
 
+
+
+test('streaming provider split sources are configured', () => {
+  const catalogs = _internals.CATALOG_SOURCES
+  assert.equal(catalogs['mafab-streaming-netflix'][0], 'https://www.mafab.hu/vod/top-streaming/netflix')
+  assert.equal(catalogs['mafab-streaming-hbo'][0], 'https://www.mafab.hu/vod/top-streaming/hbo')
+  assert.equal(catalogs['mafab-streaming-telekom-tvgo'][0], 'https://www.mafab.hu/vod/top-streaming/tvgo')
+  assert.equal(catalogs['mafab-streaming-cinego'][0], 'https://www.mafab.hu/vod/top-streaming/cinego')
+  assert.equal(catalogs['mafab-streaming-filmio'][0], 'https://www.mafab.hu/vod/top-streaming/filmio')
+  assert.equal(catalogs['mafab-streaming-amazon'][0], 'https://www.mafab.hu/vod/top-streaming/amazon')
+  assert.equal(catalogs['mafab-streaming-apple-tv'][0], 'https://www.mafab.hu/vod/top-streaming/appletv')
+  assert.equal(catalogs['mafab-streaming-disney'][0], 'https://www.mafab.hu/vod/top-streaming/disney')
+  assert.equal(catalogs['mafab-streaming-skyshowtime'][0], 'https://www.mafab.hu/vod/top-streaming/skyshowtime')
+})
+
+test('dynamic year-based Mafab sources include year window params', () => {
+  const catalogs = _internals.CATALOG_SOURCES
+  const yearWindow = catalogs['mafab-year-window'][0]
+  const bestCurrent = catalogs['mafab-best-current-year'][0]
+  const totalGross = catalogs['mafab-total-gross'][0]
+
+  assert.match(yearWindow, /yrf=\d{4}&yrt=\d{4}/)
+  assert.match(bestCurrent, /yrf=\d{4}&yrt=\d{4}/)
+  assert.match(totalGross, /year_from=\d{4}&year_to=\d{4}/)
+})
+
 test('parsePage extracts only catalog presence (url + lookup title)', () => {
   const html = `
     <div class="item">
