@@ -189,6 +189,7 @@ function renderConfigureHtml(origin, config) {
   }
 
   form.addEventListener('change', updateLinks)
+  form.addEventListener('input', updateLinks)
   updateLinks()
 </script>
 </body>
