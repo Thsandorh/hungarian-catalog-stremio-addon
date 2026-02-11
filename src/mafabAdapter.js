@@ -139,11 +139,19 @@ function toDetailSlug(url) {
   return m ? m[1].toLowerCase() : ''
 }
 
+
+function expectedAutocompleteCats(type) {
+  return type === 'series' ? ['series', 'tv', 'serial'] : ['movie', 'film']
+}
+
 function parseAutocompleteLabel(label) {
-  const clean = stripHtml(label)
+  const raw = String(label || '')
+  const boldTitle = sanitizeText(raw.replace(/\n/g, ' ').match(/<b>(.*?)<\/b>/i)?.[1] || '')
+  const clean = stripHtml(raw)
   const year = extractYear(clean)
-  const title = normalizeTitle(clean.replace(/\s*[-–—]\s*.*$/, '').replace(/\s*\((19\d{2}|20\d{2})\).*$/, ''))
-  return { title: title || clean, year }
+  const titleFromClean = normalizeTitle(clean.replace(/\s*[-–—]\s*.*$/, '').replace(/\s*\((19\d{2}|20\d{2})\).*$/, ''))
+  const title = normalizeTitle(boldTitle || titleFromClean || clean)
+  return { title, year }
 }
 
 function parseAutocompletePayload(payload) {
@@ -164,34 +172,51 @@ function findBestAutocompleteMatch(items, row) {
   if (!entries.length) return null
 
   const targetSlug = toDetailSlug(row?.url)
-  const targetTitle = normalizeForMatch(row?.lookupTitle || row?.name)
+  const targetTitle = normalizeForMatch(row?.lookupTitle || row?.seedTitle || row?.name)
+  const expectedCats = expectedAutocompleteCats(row?.type)
 
   const scored = entries
     .map((item) => {
       const url = absolutize('https://www.mafab.hu', item?.id || item?.url || item?.value)
       const cat = String(item?.cat || '').toLowerCase()
       const parsed = parseAutocompleteLabel(item?.label || item?.value || '')
-      const titleNorm = normalizeForMatch(parsed.title)
+      const cleanValueTitle = normalizeTitle(item?.value)
+      const title = cleanValueTitle || parsed.title
+      const titleNorm = normalizeForMatch(title)
       const slug = toDetailSlug(url)
+      const year = parsed.year || extractYear(item?.year)
+      const foto = absolutize('https://www.mafab.hu', item?.foto)
       let score = 0
 
-      if (cat === 'movie' || cat === 'series' || cat === 'tv') score += 10
+      if (cat && expectedCats.includes(cat)) score += 40
+      else if (cat === 'movie' || cat === 'series' || cat === 'tv' || cat === 'serial' || cat === 'film') score += 5
+
       if (targetSlug && slug && targetSlug === slug) score += 300
-      if (targetTitle && titleNorm && targetTitle === titleNorm) score += 120
-      if (targetTitle && titleNorm && (titleNorm.includes(targetTitle) || targetTitle.includes(titleNorm))) score += 40
-      if (parsed.year) score += 5
+      if (targetTitle && titleNorm && targetTitle === titleNorm) score += 130
+      if (targetTitle && titleNorm && (titleNorm.includes(targetTitle) || targetTitle.includes(titleNorm))) score += 50
+      if (year) score += 8
+      if (foto) score += 4
 
       return {
         score,
-        title: parsed.title,
-        year: parsed.year,
-        url
+        title,
+        year,
+        url,
+        cat,
+        foto
       }
     })
     .sort((a, b) => b.score - a.score)
 
-  return scored[0]?.score > 0 ? scored[0] : null
+  const best = scored[0]
+  if (!best || best.score <= 0) return null
+
+  const hasExpected = scored.some((x) => expectedCats.includes(x.cat))
+  if (!hasExpected) return best
+
+  return scored.find((x) => expectedCats.includes(x.cat)) || best
 }
+
 
 function getTmdbApiKey() {
   return process.env.TMDB_API_KEY || process.env.MAFAB_TMDB_API_KEY || DEFAULT_TMDB_API_KEY
@@ -327,6 +352,7 @@ async function enrichRows(rows, { type = 'movie', maxItems = 30, concurrency = 4
       if (current >= maxItems) break
 
       const row = out[current]
+      row.type = type
       const queryTitle = row.seedTitle || row.lookupTitle || row.name
       const autocompleteItems = await searchAutocomplete(queryTitle)
       const best = findBestAutocompleteMatch(autocompleteItems, row)
@@ -336,6 +362,7 @@ async function enrichRows(rows, { type = 'movie', maxItems = 30, concurrency = 4
 
       if (best?.year) row.year = best.year
       if (best?.url) row.url = best.url
+      if (best?.foto) row.mafabPoster = best.foto
 
       const tmdbTitles = [row.name, row.seedTitle, row.lookupTitle].map((v) => normalizeTitle(v)).filter((v, i, a) => v && a.indexOf(v) === i)
       for (const tmdbTitle of tmdbTitles) {
@@ -367,7 +394,7 @@ function toId(url, imdb) {
 function toMeta(row, { type = 'movie' } = {}) {
   const imdbId = row.imdbId || extractImdbId(row.url)
   const id = toId(row.url, imdbId)
-  const poster = imdbId ? `https://images.metahub.space/poster/medium/${imdbId}/img` : undefined
+  const poster = imdbId ? `https://images.metahub.space/poster/medium/${imdbId}/img` : (row.mafabPoster || undefined)
 
   return {
     id,
