@@ -63,6 +63,24 @@ test('normalizeTitle strips noise tokens and trailing year', () => {
   assert.equal(_internals.normalizeTitle('NA Egyél müzlit! (2021)'), 'Egyél müzlit!')
 })
 
+test('toMeta strips NA prefix from scraped title noise', () => {
+  const meta = _internals.toMeta({
+    name: 'NA Beléd estem',
+    url: 'https://www.mafab.hu/movies/beled-estem-1.html'
+  })
+
+  assert.equal(meta.name, 'Beléd estem')
+})
+
+test('toMeta strips trailing year from title in final output', () => {
+  const meta = _internals.toMeta({
+    name: 'Egyél müzlit! (2021)',
+    url: 'https://www.mafab.hu/movies/egyel-muzlit-123.html'
+  })
+
+  assert.equal(meta.name, 'Egyél müzlit!')
+})
+
 test('toMeta uses Cinemeta poster when imdb id exists', () => {
   const meta = _internals.toMeta({
     name: 'The Godfather',

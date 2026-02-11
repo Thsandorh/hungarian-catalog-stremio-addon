@@ -320,6 +320,56 @@ function toId(url, imdb) {
   return `mafab:${Buffer.from(String(url || '')).toString('base64url').slice(0, 24)}`
 }
 
+async function enrichRows(rows, { type = 'movie', maxItems = 30, concurrency = 4 } = {}) {
+  const out = [...rows]
+  let idx = 0
+
+  async function worker() {
+    while (idx < out.length) {
+      const current = idx
+      idx += 1
+      if (current >= maxItems) break
+
+      const row = out[current]
+      const slugTitle = normalizeTitle(titleFromDetailUrl(row.url))
+      row.name = normalizeTitle(row.name) || slugTitle
+      if (!hasUsefulTitle(row.name) && hasUsefulTitle(slugTitle)) row.name = slugTitle
+
+      const shouldEnrich = !row.imdbId || !extractYear(row.releaseInfo) || !hasUsefulTitle(row.name)
+      if (!shouldEnrich) continue
+
+      const queryTitles = uniqueNonEmpty([row.name, slugTitle, normalizeLookupTitle(row.name)])
+      const best = await findBestAutocompleteAcrossQueries(queryTitles, row)
+      if (best?.title) row.name = normalizeTitle(best.title)
+      if (best?.year && !extractYear(row.releaseInfo)) row.releaseInfo = String(best.year)
+      if (best?.url) row.url = best.url
+
+      if (!row.imdbId) {
+        const year = extractYear(row.releaseInfo) || best?.year || null
+        const lookupTitles = uniqueNonEmpty([row.name, slugTitle, best?.title])
+        for (const lookupTitle of lookupTitles) {
+          const imdbId = await searchTmdbImdbId({ title: lookupTitle, year, type })
+          if (imdbId) {
+            row.imdbId = imdbId
+            break
+          }
+        }
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker())
+  await Promise.allSettled(workers)
+  return out
+}
+
+function toId(url, imdb) {
+  if (imdb) return imdb
+  const m = String(url || '').match(/\/movies\/([^/]+)\.html/i)
+  if (m) return `mafab:${m[1].toLowerCase()}`
+  return `mafab:${Buffer.from(String(url || '')).toString('base64url').slice(0, 24)}`
+}
+
 function toMeta(row, { type = 'movie' } = {}) {
   const imdbId = row.imdbId || extractImdbId(row.url)
   const id = toId(row.url, imdbId)
