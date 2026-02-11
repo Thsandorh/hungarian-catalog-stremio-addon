@@ -77,9 +77,13 @@ function getRequestOrigin(req) {
   return `${protocol}://${host}`
 }
 
-function renderConfigureHtml(origin, config, currentToken = null) {
+function renderConfigureHtml(origin, config) {
   const token = encodeConfig(config)
-  const manifestUrl = `${origin}/${token}/manifest.json`
+  const defaultToken = encodeConfig(defaultConfig())
+  const useTokenizedPath = token !== defaultToken
+  const manifestPath = useTokenizedPath ? `/${token}/manifest.json` : '/manifest.json'
+  const configurePath = useTokenizedPath ? `/${token}/configure` : '/configure'
+  const manifestUrl = `${origin}${manifestPath}`
   const stremioManifest = manifestUrl.replace(/^https?:\/\//, '')
   const stremioUrl = `stremio://${stremioManifest}`
 
@@ -164,7 +168,7 @@ function renderConfigureHtml(origin, config, currentToken = null) {
   const form = document.getElementById('cfgForm')
   const installBtn = document.getElementById('installBtn')
   const manifestEl = document.getElementById('manifestUrl')
-  const initialToken = ${JSON.stringify(currentToken || token)}
+  const defaultToken = ${JSON.stringify(encodeConfig(defaultConfig()))}
 
   function encodeConfigToken(cfg) {
     const json = JSON.stringify(cfg)
@@ -197,11 +201,13 @@ function renderConfigureHtml(origin, config, currentToken = null) {
   function updateLinks() {
     const cfg = buildConfig()
     const token = encodeConfigToken(cfg)
-    const manifest = location.origin + '/' + token + '/manifest.json'
-    const configure = location.origin + '/' + token + '/configure'
+    const useTokenizedPath = token !== defaultToken
+    const manifestPath = useTokenizedPath ? '/' + token + '/manifest.json' : '/manifest.json'
+    const configurePath = useTokenizedPath ? '/' + token + '/configure' : '/configure'
+    const manifest = location.origin + manifestPath
     manifestEl.textContent = manifest
     installBtn.href = 'stremio://' + manifest.replace(/^https?:\/\//, '')
-    history.replaceState(null, '', configure)
+    history.replaceState(null, '', configurePath)
   }
 
   form.addEventListener('change', updateLinks)
@@ -226,7 +232,7 @@ module.exports = async (req, res) => {
     }
 
     if (rest.length === 1 && rest[0] === 'configure') {
-      return sendHtml(res, 200, renderConfigureHtml(getRequestOrigin(req), config, token))
+      return sendHtml(res, 200, renderConfigureHtml(getRequestOrigin(req), config))
     }
 
     if (rest.length === 1 && rest[0] === 'manifest.json') {

@@ -35,6 +35,24 @@ test('configure html stremio link does not include nested https protocol', () =>
   assert.doesNotMatch(html, /stremio:\/\/https:\/\//)
 })
 
+
+test('configure html uses plain /manifest.json for default config', () => {
+  const html = renderConfigureHtml('https://porthu-addon.vercel.app', {
+    sources: { mafab: true }
+  })
+
+  assert.match(html, /<code id="manifestUrl">https:\/\/porthu-addon\.vercel\.app\/manifest\.json<\/code>/)
+  assert.match(html, /href="stremio:\/\/porthu-addon\.vercel\.app\/manifest\.json"/)
+})
+
+test('configure html uses tokenized manifest path for non-default config', () => {
+  const html = renderConfigureHtml('https://porthu-addon.vercel.app', {
+    sources: { mafab: false }
+  })
+
+  assert.match(html, /<code id="manifestUrl">https:\/\/porthu-addon\.vercel\.app\/[A-Za-z0-9_-]+\/manifest\.json<\/code>/)
+})
+
 test('tokenized manifest endpoint returns catalogs without server error', async () => {
   const token = encodeConfig({ sources: { mafab: true } })
   const req = {
