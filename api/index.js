@@ -236,13 +236,12 @@ module.exports = async (req, res) => {
     }
 
     if (rest.length === 1 && rest[0] === 'manifest.json') {
-      const requestOrigin = getRequestOrigin(req)
       return sendJson(
         res,
         200,
         {
           ...manifest,
-          logo: `${requestOrigin}/logo.svg`
+          logo: '/logo.svg'
         },
         'public, max-age=300'
       )

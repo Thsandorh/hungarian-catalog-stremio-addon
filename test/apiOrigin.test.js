@@ -83,7 +83,7 @@ test('tokenized manifest endpoint returns catalogs without server error', async 
 })
 
 
-test('manifest endpoint includes absolute logo url', async () => {
+test('manifest endpoint includes stable relative logo url', async () => {
   const token = encodeConfig({ sources: { mafab: true } })
   const req = {
     url: `/${token}/manifest.json`,
@@ -106,7 +106,7 @@ test('manifest endpoint includes absolute logo url', async () => {
 
   assert.equal(res.statusCode, 200)
   const payload = JSON.parse(body)
-  assert.equal(payload.logo, 'https://flix.example.com/logo.svg')
+  assert.equal(payload.logo, '/logo.svg')
 })
 
 test('logo svg endpoint returns image content type', async () => {
