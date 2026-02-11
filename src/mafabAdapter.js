@@ -59,6 +59,10 @@ function normalizeForMatch(value) {
     .trim()
 }
 
+function hasLetters(value) {
+  return /\p{L}{2,}/u.test(sanitizeText(value))
+}
+
 function normalizeTitle(value) {
   return sanitizeText(value)
     .replace(/^\d{1,3}\s+(?=\p{L}|\d)/u, '')
@@ -93,9 +97,14 @@ function extractImdbId(value) {
 }
 
 function titleFromDetailUrl(url) {
-  const m = String(url || '').match(/\/movies\/([^/?#]+?)(?:-\d+)?\.html/i)
+  const m = String(url || '').match(/\/movies\/([^/?#]+)\.html/i)
   if (!m) return ''
-  const words = sanitizeText(m[1].replace(/[-_]+/g, ' ')).split(' ')
+
+  const rawSlug = m[1].replace(/-{1,2}\d+$/u, '')
+  const cleanSlug = sanitizeText(rawSlug.replace(/[-_]+/g, ' '))
+  if (!hasLetters(cleanSlug)) return ''
+
+  const words = cleanSlug.split(' ')
   return words.map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
 }
 
@@ -267,59 +276,26 @@ function parsePage(html, pageUrl) {
     if (!detailUrl || seen.has(detailUrl)) return
     seen.add(detailUrl)
 
+    const anchorTitle = normalizeTitle($(el).attr('title') || $(el).attr('aria-label') || $(el).text())
     const lookupTitle = titleFromDetailUrl(detailUrl)
-    if (!lookupTitle) return
+    const seedTitle = hasLetters(anchorTitle) ? anchorTitle : lookupTitle
+    if (!seedTitle) return
 
     rows.push({
       url: detailUrl,
       lookupTitle,
-      name: lookupTitle,
+      seedTitle,
+      name: lookupTitle || seedTitle,
       year: null,
       imdbId: null
     })
   })
-
-  return rows
-}
-
-async function enrichRows(rows, { type = 'movie', maxItems = 30, concurrency = 4 } = {}) {
-  const out = [...rows]
-  let idx = 0
-
-  async function worker() {
-    while (idx < out.length) {
-      const current = idx
-      idx += 1
-      if (current >= maxItems) break
-
-      const row = out[current]
-      const autocompleteItems = await searchAutocomplete(row.lookupTitle || row.name)
-      const best = findBestAutocompleteMatch(autocompleteItems, row)
-
-      if (best?.title) row.name = normalizeTitle(best.title)
-      if (best?.year) row.year = best.year
-      if (best?.url) row.url = best.url
-
-      row.imdbId = await searchTmdbImdbId({
-        title: row.name || row.lookupTitle,
-        year: row.year || null,
-        type
-      })
-    }
-  }
 
   const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker())
   await Promise.allSettled(workers)
   return out
 }
 
-function toId(url, imdb) {
-  if (imdb) return imdb
-  const m = String(url || '').match(/\/movies\/([^/]+)\.html/i)
-  if (m) return `mafab:${m[1].toLowerCase()}`
-  return `mafab:${Buffer.from(String(url || '')).toString('base64url').slice(0, 24)}`
-}
-
 async function enrichRows(rows, { type = 'movie', maxItems = 30, concurrency = 4 } = {}) {
   const out = [...rows]
   let idx = 0
@@ -331,28 +307,26 @@ async function enrichRows(rows, { type = 'movie', maxItems = 30, concurrency = 4
       if (current >= maxItems) break
 
       const row = out[current]
-      const slugTitle = normalizeTitle(titleFromDetailUrl(row.url))
-      row.name = normalizeTitle(row.name) || slugTitle
-      if (!hasUsefulTitle(row.name) && hasUsefulTitle(slugTitle)) row.name = slugTitle
+      const queryTitle = row.seedTitle || row.lookupTitle || row.name
+      const autocompleteItems = await searchAutocomplete(queryTitle)
+      const best = findBestAutocompleteMatch(autocompleteItems, row)
 
-      const shouldEnrich = !row.imdbId || !extractYear(row.releaseInfo) || !hasUsefulTitle(row.name)
-      if (!shouldEnrich) continue
-
-      const queryTitles = uniqueNonEmpty([row.name, slugTitle, normalizeLookupTitle(row.name)])
-      const best = await findBestAutocompleteAcrossQueries(queryTitles, row)
       if (best?.title) row.name = normalizeTitle(best.title)
-      if (best?.year && !extractYear(row.releaseInfo)) row.releaseInfo = String(best.year)
+      else if (!hasLetters(row.name)) row.name = normalizeTitle(row.seedTitle || row.lookupTitle)
+
+      if (best?.year) row.year = best.year
       if (best?.url) row.url = best.url
 
-      if (!row.imdbId) {
-        const year = extractYear(row.releaseInfo) || best?.year || null
-        const lookupTitles = uniqueNonEmpty([row.name, slugTitle, best?.title])
-        for (const lookupTitle of lookupTitles) {
-          const imdbId = await searchTmdbImdbId({ title: lookupTitle, year, type })
-          if (imdbId) {
-            row.imdbId = imdbId
-            break
-          }
+      const tmdbTitles = [row.name, row.seedTitle, row.lookupTitle].map((v) => normalizeTitle(v)).filter((v, i, a) => v && a.indexOf(v) === i)
+      for (const tmdbTitle of tmdbTitles) {
+        const imdbId = await searchTmdbImdbId({
+          title: tmdbTitle,
+          year: row.year || null,
+          type
+        })
+        if (imdbId) {
+          row.imdbId = imdbId
+          break
         }
       }
     }
@@ -378,7 +352,7 @@ function toMeta(row, { type = 'movie' } = {}) {
   return {
     id,
     type,
-    name: normalizeTitle(row.name) || normalizeTitle(row.lookupTitle) || 'Ismeretlen cím',
+    name: normalizeTitle(row.name) || normalizeTitle(row.seedTitle) || normalizeTitle(row.lookupTitle) || 'Ismeretlen cím',
     poster,
     releaseInfo: row.year ? String(row.year) : undefined,
     imdb_id: imdbId || undefined,
@@ -492,6 +466,7 @@ module.exports = {
     findBestAutocompleteMatch,
     titleFromDetailUrl,
     normalizeTitle,
+    hasLetters,
     getTmdbApiKey,
     toMeta
   }

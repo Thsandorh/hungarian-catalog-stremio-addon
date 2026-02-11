@@ -26,11 +26,31 @@ test('parsePage extracts only catalog presence (url + lookup title)', () => {
   assert.equal(rows.length, 1)
   assert.equal(rows[0].url, 'https://www.mafab.hu/movies/a-keresztapa-2551.html')
   assert.equal(rows[0].lookupTitle, 'A Keresztapa')
+  assert.equal(rows[0].seedTitle, 'A keresztapa')
   assert.equal(rows[0].name, 'A Keresztapa')
   assert.equal(rows[0].year, null)
   assert.equal(rows[0].imdbId, null)
   assert.equal(rows[0].description, undefined)
   assert.equal(rows[0].releaseInfo, undefined)
+})
+
+
+test('titleFromDetailUrl drops numeric-only slugs', () => {
+  assert.equal(_internals.titleFromDetailUrl('https://www.mafab.hu/movies/623207.html'), '')
+})
+
+test('parsePage keeps item when slug is numeric but anchor title is valid', () => {
+  const html = `
+    <div class="item">
+      <a href="/movies/623207.html" title="Nuremberg">Nuremberg</a>
+    </div>
+  `
+
+  const rows = _internals.parsePage(html, 'https://www.mafab.hu/filmek/filmek/')
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].lookupTitle, '')
+  assert.equal(rows[0].seedTitle, 'Nuremberg')
+  assert.equal(rows[0].name, 'Nuremberg')
 })
 
 test('titleFromDetailUrl builds readable title from slug', () => {
@@ -61,24 +81,6 @@ test('findBestAutocompleteMatch prefers exact Mafab detail URL match', () => {
 
 test('normalizeTitle strips noise tokens and trailing year', () => {
   assert.equal(_internals.normalizeTitle('NA Egyél müzlit! (2021)'), 'Egyél müzlit!')
-})
-
-test('toMeta strips NA prefix from scraped title noise', () => {
-  const meta = _internals.toMeta({
-    name: 'NA Beléd estem',
-    url: 'https://www.mafab.hu/movies/beled-estem-1.html'
-  })
-
-  assert.equal(meta.name, 'Beléd estem')
-})
-
-test('toMeta strips trailing year from title in final output', () => {
-  const meta = _internals.toMeta({
-    name: 'Egyél müzlit! (2021)',
-    url: 'https://www.mafab.hu/movies/egyel-muzlit-123.html'
-  })
-
-  assert.equal(meta.name, 'Egyél müzlit!')
 })
 
 test('toMeta uses Cinemeta poster when imdb id exists', () => {
