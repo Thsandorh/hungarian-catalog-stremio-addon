@@ -74,7 +74,7 @@ function getRequestOrigin(req) {
   return `${protocol}://${host}`
 }
 
-function renderConfigureHtml(origin, config) {
+function renderConfigureHtml(origin, config, currentToken = null) {
   const token = encodeConfig(config)
   const manifestUrl = `${origin}/${token}/manifest.json`
   const stremioManifest = manifestUrl.replace(/^https?:\/\//, '')
@@ -161,6 +161,17 @@ function renderConfigureHtml(origin, config) {
   const form = document.getElementById('cfgForm')
   const installBtn = document.getElementById('installBtn')
   const manifestEl = document.getElementById('manifestUrl')
+  const initialToken = ${JSON.stringify(currentToken || token)}
+
+  function encodeConfigToken(cfg) {
+    const json = JSON.stringify(cfg)
+    const bytes = new TextEncoder().encode(json)
+    let binary = ''
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte)
+    })
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+  }
 
   function buildConfig() {
     const cfg = {
@@ -182,13 +193,19 @@ function renderConfigureHtml(origin, config) {
 
   function updateLinks() {
     const cfg = buildConfig()
-    const token = btoa(JSON.stringify(cfg)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+    const token = encodeConfigToken(cfg)
     const manifest = location.origin + '/' + token + '/manifest.json'
+    const configure = location.origin + '/' + token + '/configure'
     manifestEl.textContent = manifest
     installBtn.href = 'stremio://' + manifest.replace(/^https?:\/\//, '')
+    history.replaceState(null, '', configure)
   }
 
   form.addEventListener('change', updateLinks)
+  if (!location.pathname.startsWith('/' + initialToken + '/')) {
+    const defaultConfigure = location.origin + '/' + initialToken + '/configure'
+    history.replaceState(null, '', defaultConfigure)
+  }
   updateLinks()
 </script>
 </body>
@@ -208,8 +225,8 @@ module.exports = async (req, res) => {
       return res.end('Redirecting to /configure')
     }
 
-    if (rest.length === 1 && rest[0] === 'configure' && !token) {
-      return sendHtml(res, 200, renderConfigureHtml(getRequestOrigin(req), config))
+    if (rest.length === 1 && rest[0] === 'configure') {
+      return sendHtml(res, 200, renderConfigureHtml(getRequestOrigin(req), config, token))
     }
 
     if (rest.length === 1 && rest[0] === 'manifest.json') {
