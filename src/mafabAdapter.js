@@ -2,6 +2,7 @@ const axios = require('axios')
 const cheerio = require('cheerio')
 const { execFile } = require('node:child_process')
 const { promisify } = require('node:util')
+const path = require('node:path')
 const { createLruTtlCache } = require('./cache')
 
 const SOURCE_NAME = 'mafab.hu'
@@ -70,19 +71,23 @@ const CATALOG_STORE_MAX = Number(process.env.MAFAB_CATALOG_STORE_MAX || 800)
 
 const META_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.MAFAB_META_CACHE_MAX || 12000),
-  defaultTtlMs: Number(process.env.MAFAB_META_CACHE_TTL_MS || 12 * 60 * 60 * 1000)
+  defaultTtlMs: Number(process.env.MAFAB_META_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'mafab_meta.json')
 })
 const AUTOCOMPLETE_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.MAFAB_AUTOCOMPLETE_CACHE_MAX || 8000),
-  defaultTtlMs: Number(process.env.MAFAB_AUTOCOMPLETE_CACHE_TTL_MS || 24 * 60 * 60 * 1000)
+  defaultTtlMs: Number(process.env.MAFAB_AUTOCOMPLETE_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'mafab_autocomplete.json')
 })
 const TMDB_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.MAFAB_TMDB_CACHE_MAX || 20000),
-  defaultTtlMs: Number(process.env.MAFAB_TMDB_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000)
+  defaultTtlMs: Number(process.env.MAFAB_TMDB_CACHE_TTL_MS || 7 * 24 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'mafab_tmdb.json')
 })
 const CATALOG_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.MAFAB_CATALOG_CACHE_MAX || 128),
-  defaultTtlMs: Number(process.env.MAFAB_CATALOG_CACHE_TTL_MS || 10 * 60 * 1000)
+  defaultTtlMs: Number(process.env.MAFAB_CATALOG_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'mafab_catalog.json')
 })
 
 const execFileAsync = promisify(execFile)
@@ -580,6 +585,14 @@ async function fetchCatalog({ type = 'movie', catalogId = 'hu-mixed', genre, ski
   })
 
   metas.forEach((m) => META_CACHE.set(m.id, m))
+
+  // Unawaited background saves
+  Promise.all([
+    CATALOG_CACHE.save(),
+    META_CACHE.save(),
+    TMDB_CACHE.save(),
+    AUTOCOMPLETE_CACHE.save()
+  ]).catch((err) => console.error('[Mafab] Background cache save error:', err.message))
 
   return {
     source: SOURCE_NAME,
