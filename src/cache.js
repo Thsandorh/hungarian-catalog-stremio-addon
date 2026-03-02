@@ -11,10 +11,27 @@ function clampMs(value, fallback) {
 // Small in-memory LRU cache with optional TTL.
 // - Uses Map insertion order for LRU: newest at the end.
 // - TTL is checked on get/has/set; expired entries are removed lazily.
-function createLruTtlCache({ maxEntries = 1000, defaultTtlMs = 0 } = {}) {
+const fs = require('node:fs')
+const path = require('node:path')
+
+function createLruTtlCache({ maxEntries = 1000, defaultTtlMs = 0, persistPath = null } = {}) {
   const max = Math.max(0, clampInt(maxEntries, 1000))
   const ttlDefault = Math.max(0, clampMs(defaultTtlMs, 0))
   const map = new Map()
+
+  if (persistPath) {
+    try {
+      if (fs.existsSync(persistPath)) {
+        const raw = fs.readFileSync(persistPath, 'utf8')
+        const entries = JSON.parse(raw)
+        for (const [k, v] of entries) {
+          map.set(k, v)
+        }
+      }
+    } catch (err) {
+      console.error(`[Cache] Failed to load cache from ${persistPath}:`, err.message)
+    }
+  }
 
   function nowMs() {
     return Date.now()
@@ -89,6 +106,20 @@ function createLruTtlCache({ maxEntries = 1000, defaultTtlMs = 0 } = {}) {
     },
     size() {
       return map.size
+    },
+    async save() {
+      if (!persistPath) return
+      try {
+        const dir = path.dirname(persistPath)
+        if (!fs.existsSync(dir)) await fs.promises.mkdir(dir, { recursive: true })
+
+        // Serialize outside the main write to still capture map state quickly,
+        // but write asynchronously to prevent blocking the event loop on huge files.
+        const data = JSON.stringify([...map.entries()])
+        await fs.promises.writeFile(persistPath, data)
+      } catch (err) {
+        console.error(`[Cache] Failed to save cache to ${persistPath}:`, err.message)
+      }
     }
   }
 }

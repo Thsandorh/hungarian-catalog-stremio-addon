@@ -2,6 +2,7 @@ const crypto = require('node:crypto')
 const { URL } = require('node:url')
 
 const axios = require('axios')
+const path = require('node:path')
 const cheerio = require('cheerio')
 const { createLruTtlCache } = require('./cache')
 
@@ -15,19 +16,23 @@ const SOURCE_URLS = ['https://port.hu/film', 'https://port.hu/tv', 'https://port
 
 const META_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.PORT_HU_META_CACHE_MAX || 6000),
-  defaultTtlMs: Number(process.env.PORT_HU_META_CACHE_TTL_MS || 12 * 60 * 60 * 1000)
+  defaultTtlMs: Number(process.env.PORT_HU_META_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'porthu_meta.json')
 })
 const DETAIL_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.PORT_HU_DETAIL_CACHE_MAX || 4000),
-  defaultTtlMs: Number(process.env.PORT_HU_DETAIL_CACHE_TTL_MS || 2 * 60 * 60 * 1000)
+  defaultTtlMs: Number(process.env.PORT_HU_DETAIL_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'porthu_detail.json')
 })
 const PAGE_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.PORT_HU_PAGE_CACHE_MAX || 64),
-  defaultTtlMs: PAGE_CACHE_TTL_MS
+  defaultTtlMs: Number(process.env.PORT_HU_PAGE_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'porthu_page.json')
 })
 const CATALOG_CACHE = createLruTtlCache({
   maxEntries: Number(process.env.PORT_HU_CATALOG_CACHE_MAX || 256),
-  defaultTtlMs: CATALOG_CACHE_TTL_MS
+  defaultTtlMs: Number(process.env.PORT_HU_CATALOG_CACHE_TTL_MS || 48 * 60 * 60 * 1000),
+  persistPath: path.join(__dirname, '..', '.cache', 'porthu_catalog.json')
 })
 
 const http = axios.create({
@@ -385,6 +390,15 @@ async function fetchCatalog({ catalogId = 'hu-mixed', genre, skip = 0, limit = 5
   }
 
   CATALOG_CACHE.set(key, payload)
+
+  // Unawaited background saves
+  Promise.all([
+    CATALOG_CACHE.save(),
+    META_CACHE.save(),
+    DETAIL_CACHE.save(),
+    PAGE_CACHE.save()
+  ]).catch((err) => console.error('[Port.hu] Background cache save error:', err.message))
+
   return payload
 }
 

@@ -41,7 +41,20 @@ const server = http.createServer((req, res) => {
   })
 })
 
-server.listen(PORT, () => {
+const { runSync } = require('./scripts/sync')
+
+server.listen(PORT, async () => {
   const configurePath = `${APP_BASE_PATH}/configure` || '/configure'
   console.log(`Flix-Catalogs addon ready at http://127.0.0.1:${PORT}${configurePath}`)
+
+  console.log('Starting initial sync...')
+  await runSync()
+  console.log('Initial sync completed.')
+
+  const ONE_DAY = 24 * 60 * 60 * 1000
+  setInterval(async () => {
+    console.log('Starting daily sync...')
+    await runSync()
+    console.log('Daily sync completed.')
+  }, ONE_DAY)
 })

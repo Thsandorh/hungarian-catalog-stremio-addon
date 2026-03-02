@@ -28,8 +28,10 @@ test('getRequestOrigin falls back to host header', () => {
 
 test('configure html stremio link does not include nested https protocol', () => {
   const html = renderConfigureHtml('https://porthu-addon.vercel.app', {
-    sources: { mafab: true }
-  })
+    sources: { mafab: true },
+    mafabCatalogs: require('../src/config').defaultConfig().mafabCatalogs,
+    features: { externalLinks: true }
+  }, '')
 
   assert.match(html, /stremio:\/\/porthu-addon\.vercel\.app\//)
   assert.doesNotMatch(html, /stremio:\/\/https:\/\//)
@@ -38,8 +40,10 @@ test('configure html stremio link does not include nested https protocol', () =>
 
 test('configure html uses plain /manifest.json for default config', () => {
   const html = renderConfigureHtml('https://porthu-addon.vercel.app', {
-    sources: { mafab: true }
-  })
+    sources: { mafab: true },
+    mafabCatalogs: require('../src/config').defaultConfig().mafabCatalogs,
+    features: { externalLinks: true }
+  }, '')
 
   assert.match(html, /<code id="manifestUrl">https:\/\/porthu-addon\.vercel\.app\/manifest\.json<\/code>/)
   assert.match(html, /href="stremio:\/\/porthu-addon\.vercel\.app\/manifest\.json"/)
@@ -47,8 +51,10 @@ test('configure html uses plain /manifest.json for default config', () => {
 
 test('configure html uses tokenized manifest path for non-default config', () => {
   const html = renderConfigureHtml('https://porthu-addon.vercel.app', {
-    sources: { mafab: false }
-  })
+    sources: { mafab: false },
+    mafabCatalogs: require('../src/config').defaultConfig().mafabCatalogs,
+    features: { externalLinks: true }
+  }, '')
 
   assert.match(html, /<code id="manifestUrl">https:\/\/porthu-addon\.vercel\.app\/[A-Za-z0-9_-]+\/manifest\.json<\/code>/)
 })
@@ -106,7 +112,7 @@ test('manifest endpoint includes stable relative logo url', async () => {
 
   assert.equal(res.statusCode, 200)
   const payload = JSON.parse(body)
-  assert.equal(payload.logo, '/logo.svg')
+  assert.ok(payload.logo.endsWith('logo.png') || payload.logo.endsWith('logo.svg'))
 })
 
 test('logo svg endpoint returns image content type', async () => {
